@@ -1,7 +1,11 @@
 require "option_parser"
 
 module Catalyst
+  ## CLI entry point. Parses ARGV, loads config, runs analysis, formats output.
   class CLI
+    ## Parse arguments and execute the analysis pipeline.
+    ##
+    ## Returns exit code (0 = success, 1 = findings in CI mode).
     def self.run(args : Array(String) = ARGV) : Int32
       options = Options.new
       config_path = ".catalyst.yml"
@@ -51,13 +55,21 @@ module Catalyst
     end
   end
 
+  ## CLI flags and options parsed from ARGV.
   struct Options
+    ## Output format: terminal, json, or sarif.
     property format : String = "terminal"
+    ## Minimum severity to display.
     property min_severity : String = "hint"
+    ## Apply safe auto-fixes.
     property fix : Bool = false
+    ## CI mode — exit code 1 on findings.
     property ci : Bool = false
+    ## Comma-separated rule IDs to enable (optional).
     property rules : Array(String)? = nil
+    ## Comma-separated rule IDs to disable (optional).
     property ignore : Array(String)? = nil
+    ## List all rules and exit.
     property list_rules : Bool = false
   end
 end

@@ -9,6 +9,10 @@ require "./catalyst/formatters/json"
 require "./catalyst/runner"
 require "./cli"
 
+## Static performance analysis tool for Crystal.
+##
+## Detects performance anti-patterns via AST traversal
+## using the built-in `Crystal::Parser`.
 module Catalyst
 end
 

@@ -2,7 +2,9 @@ require "json"
 
 module Catalyst
   module Formatters
+    ## JSON array output. Each result is a JSON object in the array.
     class Json < Formatter
+      ## Write findings as a JSON array to IO.
       def output(results : Array(Result), io : IO, min_severity : String) : Nil
         filtered = results.select { |r| severity_level(r.severity) >= severity_level(min_severity) }
         io.puts filtered.to_json
@@ -13,7 +15,12 @@ module Catalyst
       end
     end
 
+    ## SARIF 2.1.0 output format.
+    ##
+    ## Complies with OASIS SARIF specification for integration
+    ## with GitHub Code Scanning, VS Code, and other tools.
     class Sarif < Formatter
+      ## Write findings as a SARIF document to IO.
       def output(results : Array(Result), io : IO, min_severity : String) : Nil
         filtered = results.select { |r| severity_level(r.severity) >= severity_level(min_severity) }
         sarif = generate_sarif(filtered)

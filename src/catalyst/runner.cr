@@ -2,13 +2,16 @@ require "file_utils"
 require "compiler/crystal/syntax"
 
 module Catalyst
+  ## Collects source files, parses with `Crystal::Parser`, dispatches AST to rules.
   class Runner
     @rules : Array(Rule)
 
+    ## Initialize with config and CLI options. Loads active rules.
     def initialize(@config : Config, @options : Options)
       @rules = load_rules
     end
 
+    ## Process all paths and return findings.
     def run(paths : Array(String)) : Array(Result)
       files = collect_files(paths)
       results = [] of Result
@@ -46,7 +49,6 @@ module Catalyst
           files << path
         end
       end
-      # Apply ignore patterns from config
       files.reject! do |f|
         @config.ignore.any? { |pattern| File.match?(pattern, f) }
       end
@@ -55,7 +57,6 @@ module Catalyst
     end
 
     private def load_rules : Array(Rule)
-      # Phase 1: return empty — rules registered via macros later
       Rule.all.select(&.enabled_by_default?)
     end
   end

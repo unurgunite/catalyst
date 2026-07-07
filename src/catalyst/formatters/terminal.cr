@@ -2,7 +2,9 @@ require "colorize"
 
 module Catalyst
   module Formatters
+    ## Colorized human-readable output to STDOUT.
     class Terminal < Formatter
+      ## ANSI color codes per severity level.
       SEVERITY_COLORS = {
         "error"   => :red,
         "warning" => :yellow,
@@ -10,6 +12,7 @@ module Catalyst
         "hint"    => :dim,
       }
 
+      ## Write findings as colorized lines with severity, location, and suggestion.
       def output(results : Array(Result), io : IO, min_severity : String) : Nil
         filtered = filter_by_severity(results, min_severity)
         return if filtered.empty?
