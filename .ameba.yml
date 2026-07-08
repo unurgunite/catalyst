@@ -4,4 +4,4 @@ Lint/Formatting:
 Globs:
   - "**/*.cr"
   - "!lib"
-  - "!bench/**"
+  - "!bench/**/*.cr"
