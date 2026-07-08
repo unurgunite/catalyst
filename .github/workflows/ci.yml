@@ -1,0 +1,64 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            crystal: "1.12.0"
+          - os: ubuntu-latest
+            crystal: "1.20.0"
+          - os: ubuntu-latest
+            crystal: latest
+          - os: macos-latest
+            crystal: latest
+          - os: macos-15-intel
+            crystal: latest
+          - os: windows-latest
+            crystal: latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Crystal ${{ matrix.crystal }}
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: ${{ matrix.crystal }}
+
+      - name: Cache shards
+        if: runner.os != 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/shards
+          key: ${{ runner.os }}-shards-${{ matrix.crystal }}-${{ hashFiles('shard.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-shards-${{ matrix.crystal }}-
+
+      - name: Install dependencies
+        run: shards install
+
+      - name: Check formatting
+        if: matrix.crystal == '1.20.0'
+        run: crystal tool format --check
+
+      - name: Lint
+        if: runner.os != 'Windows'
+        run: crystal run bin/ameba.cr --
+
+      - name: Build
+        run: crystal build src/catalyst.cr --release -o bin/catalyst
+
+      - name: Test
+        run: crystal spec
+
+      - name: Verify binary
+        run: |
+          bin/catalyst --version
+          bin/catalyst --help
+          bin/catalyst --list-rules

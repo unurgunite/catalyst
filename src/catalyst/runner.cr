@@ -2,16 +2,16 @@ require "file_utils"
 require "compiler/crystal/syntax"
 
 module Catalyst
-  ## Collects source files, parses with `Crystal::Parser`, dispatches AST to rules.
+  # # Collects source files, parses with `Crystal::Parser`, dispatches AST to rules.
   class Runner
     @rules : Array(Rule)
 
-    ## Initialize with config and CLI options. Loads active rules.
+    # # Initialize with config and CLI options. Loads active rules.
     def initialize(@config : Config, @options : Options)
       @rules = load_rules
     end
 
-    ## Process all paths and return findings.
+    # # Process all paths and return findings.
     def run(paths : Array(String)) : Array(Result)
       files = collect_files(paths)
       results = [] of Result
@@ -44,13 +44,13 @@ module Catalyst
       files = [] of String
       paths.each do |path|
         if File.directory?(path)
-          Dir.glob(File.join(path, "**", "*.cr")).each { |f| files << f }
+          Dir.glob(File.join(path, "**", "*.cr")).each { |file| files << file }
         elsif File.file?(path) && path.ends_with?(".cr")
           files << path
         end
       end
-      files.reject! do |f|
-        @config.ignore.any? { |pattern| File.match?(pattern, f) }
+      files.reject! do |file|
+        @config.ignore.any? { |pattern| File.match?(pattern, file) }
       end
       files.sort!
       files
