@@ -38,7 +38,7 @@ module Catalyst
 
       private def union_member_count(type : Crystal::ASTNode) : Int32
         if type.is_a?(Crystal::Union)
-          type.types.sum { |t| union_member_count(t) }
+          type.types.sum { |member| union_member_count(member) }
         else
           1
         end
