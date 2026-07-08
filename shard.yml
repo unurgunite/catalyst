@@ -1,0 +1,20 @@
+name: catalyst
+version: 0.1.0
+crystal: ">= 1.12.0"
+license: MIT
+
+authors:
+  - unurgunite
+
+description: |
+  Static performance analysis for Crystal.
+  Detects allocation anti-patterns, algorithmic complexity issues,
+  and resource leaks before they reach production.
+
+dependencies:
+  # Zero runtime dependencies — uses built-in Crystal::Parser
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    version: ">= 1.6.0"
