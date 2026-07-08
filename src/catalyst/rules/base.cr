@@ -41,6 +41,11 @@ module Catalyst
     # # Called for each AST node. Return findings.
     abstract def check(node : Crystal::ASTNode, context : Context) : Array(Result)
 
+    # # Called after visiting all children of a node.
+    # # Override to clean up per-node state.
+    def end_visit(node : Crystal::ASTNode) : Nil
+    end
+
     # # Override to provide auto-fix source replacement.
     def fix(node : Crystal::ASTNode) : String?
       nil

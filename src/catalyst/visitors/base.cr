@@ -21,7 +21,12 @@ module Catalyst
         true
       end
 
-      # # Collected findings after traversal.
+      def end_visit(node : Crystal::ASTNode)
+        @rules.each do |rule|
+          rule.end_visit(node)
+        end
+      end
+
       def results : Array(Result)
         @results
       end
