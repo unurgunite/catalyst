@@ -31,7 +31,7 @@ module Catalyst
         return [] of Result unless node.is_a?(Crystal::Call)
         return [] of Result unless node.name == "select" || node.name == "reject"
         return [] of Result unless node.block
-        return [] of Result unless (obj = node.obj)
+        return [] of Result unless obj = node.obj
 
         key = obj.to_s
 
