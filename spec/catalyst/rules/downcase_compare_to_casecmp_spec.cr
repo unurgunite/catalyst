@@ -45,7 +45,7 @@ module Catalyst
 
       describe "#description" do
         it "returns description text" do
-          rule.description.should contain("casecmp?")
+          rule.description.should contain("compare")
           rule.description.should contain("downcase")
         end
       end

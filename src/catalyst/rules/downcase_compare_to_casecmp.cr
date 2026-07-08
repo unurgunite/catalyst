@@ -1,9 +1,9 @@
 module Catalyst
   module Rules
-    # # Detects `downcase` + `==` / `!=` and suggests `casecmp?`.
+    # # Detects `downcase` + `==` / `!=` and suggests `compare(case_insensitive: true)`.
     ##
     # # `str1.downcase == str2.downcase` allocates two downcased strings.
-    # # `str1.casecmp?(str2)` compares case-insensitively without allocation.
+    # # `str1.compare(str2, case_insensitive: true) == 0` compares case-insensitively without allocation.
     class DowncaseCompareToCasecmp < Rule
       def id : String
         "CAT-018"
@@ -14,7 +14,7 @@ module Catalyst
       end
 
       def description : String
-        "Use `casecmp?` for case-insensitive comparison instead of `downcase` + `==`"
+        "Use `compare(case_insensitive: true)` for case-insensitive comparison instead of `downcase` + `==`"
       end
 
       # # Check if node is `str.downcase == ...` or `str.downcase != ...`.
@@ -28,11 +28,11 @@ module Catalyst
         [Result.new(
           rule_id: id,
           severity: severity,
-          message: "Use `casecmp?` for case-insensitive comparison instead of `downcase` + `#{call.name}`",
+          message: "Use `compare(case_insensitive: true)` for case-insensitive comparison instead of `downcase` + `#{call.name}`",
           file: context.file,
           line: line,
           column: col,
-          suggestion: "Use `casecmp?` instead of `downcase` + `#{call.name}`",
+          suggestion: "Use `compare(case_insensitive: true)` instead of `downcase` + `#{call.name}`",
           confidence: "high",
         )]
       end
