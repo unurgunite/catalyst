@@ -1,6 +1,6 @@
 module Catalyst
   module Rules
-    class SelectMapToCompactMap < Rule
+    class SelectMapToFilterMap < Rule
       def id : String
         "CAT-033"
       end
@@ -10,7 +10,7 @@ module Catalyst
       end
 
       def description : String
-        "Use `compact_map` instead of `select` followed by `map`"
+        "Use single pass instead of `select` followed by `map`"
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
@@ -23,11 +23,11 @@ module Catalyst
         [Result.new(
           rule_id: id,
           severity: severity,
-          message: "Use `compact_map` instead of `select` followed by `map`",
+          message: "Use single pass instead of `select` followed by `map` (two intermediate arrays)",
           file: context.file,
           line: line,
           column: col,
-          suggestion: "Replace `select{}.map{}` with `compact_map{}`",
+          suggestion: "Combine into single pass: `arr.each { |x| result << transform(x) if condition(x) }`",
           confidence: "medium",
         )]
       end
