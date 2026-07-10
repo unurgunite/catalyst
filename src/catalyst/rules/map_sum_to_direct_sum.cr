@@ -17,6 +17,10 @@ module Catalyst
         "Use `sum` with a block instead of `map` followed by `sum`"
       end
 
+      def auto_fixable? : Bool
+        true
+      end
+
       # # Check if node is `map{}.sum` or `map{}.sum(initial)`.
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         call = map_sum_call(node)
@@ -30,6 +34,10 @@ module Catalyst
 
         line = call.location.try(&.line_number) || 0
         col = call.name_location.try(&.column_number) || 0
+        line_text = context.line_text(line)
+        fix = line_text.sub(/\.map(\s*\{.*\})\s*\.sum/) { ".sum#{$1}" }
+        fix = fix.sub(/\.map(\s*\(&[^)]+\))\s*\.sum/) { ".sum#{$1}" }
+        fix = nil if fix == line_text
 
         [Result.new(
           rule_id: id,
@@ -40,6 +48,7 @@ module Catalyst
           column: col,
           suggestion: "Replace `map{}.sum` with `#{suggestion}`",
           confidence: "high",
+          fix_replacement: fix,
         )]
       end
 

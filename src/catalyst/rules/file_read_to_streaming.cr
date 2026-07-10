@@ -15,6 +15,10 @@ module Catalyst
         "Use streaming instead of reading entire file at once"
       end
 
+      def auto_fixable? : Bool
+        true
+      end
+
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         call = file_read_call(node)
         return [] of Result unless call
