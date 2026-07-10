@@ -25,10 +25,11 @@ n=1000    Array#unshift=6.0e-6   s  Deque#unshift=8.0e-6   s  0.75x faster
 n=10000   Array#unshift=6.6e-5   s  Deque#unshift=8.0e-5   s  0.83x faster
 ```
 
-Note: Array's `memmove` (C-level) and contiguous memory layout make
-sequential shift/unshift competitive for small-to-medium collections.
-Deque provides consistent O(1) amortized random access shift/unshift,
-which benefits workloads with interleaved operations.
+> [!NOTE]
+> Array's `memmove` (C-level) and contiguous memory layout make
+> sequential shift/unshift competitive for small-to-medium collections.
+> Deque provides consistent O(1) amortized random access shift/unshift,
+> which benefits workloads with interleaved operations.
 
 ## Run
 

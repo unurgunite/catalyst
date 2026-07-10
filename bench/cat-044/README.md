@@ -1,8 +1,13 @@
 # CAT-044: Use `x * x` instead of `x ** 2`, `Math.sqrt` instead of `** 0.5`
 
-Power operator `**` is more general and may not inline as well. `x * x` and `Math.sqrt(x)` are more idiomatic and LLVM can optimize better.
+`x ** 2` and `x ** 0.5` use the general power operator which may not inline as well.
+`x * x` and `Math.sqrt(x)` are more idiomatic and LLVM can optimize better in theory.
 
-> **Caveat**: Benchmarks show ~1x difference — LLVM optimizes both forms to identical machine code in most cases. This is an **educational/style rule**, not a performance optimisation. Confidence lowered to `low`.
+> [!NOTE]
+> Benchmarks show ~1x difference — LLVM optimizes both forms to identical machine
+> code in most cases. This is primarily a **style/educational rule** for Crystal
+> newcomers coming from Ruby where `** 2` / `** 0.5` is common but suboptimal.
+> In Crystal the compiler handles both equally well. Confidence: `low`.
 
 ## Before / After
 

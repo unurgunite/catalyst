@@ -17,7 +17,6 @@ File.open("file.txt") { |f| f.gets }
 ## Results (macOS ARM, Crystal 1.20.3)
 
 ```
-
 === File.open vs File.open with block (microbenchmark) ===
 
 n=10      manual=0.000172 s  block=9.0e-5   s  1.91x faster

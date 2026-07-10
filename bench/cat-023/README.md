@@ -32,7 +32,8 @@ n=10000   count("_")=0.003388 s  count('_')=0.000907 s  3.74x faster
 n=100000  count("_")=0.036615 s  count('_')=0.00856  s  4.28x faster
 ```
 
-Note: `includes?` shows negligible difference. `count` with char is ~4x faster.
+> [!NOTE]
+> `includes?` shows negligible difference. `count` with char is ~4x faster.
 
 ## Run
 

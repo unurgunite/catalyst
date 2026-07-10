@@ -12,11 +12,11 @@ str.split("").each { }  # → str.each_char { }
 ## Results (macOS ARM, Crystal 1.20.3)
 
 ```
-n=10      TBD
-n=100     TBD
-n=1000    TBD
-n=10000   TBD
-n=100000  TBD
+n=10      split("")=3.0e-6   s  each_char=3.0e-6   s  0.97x faster
+n=100     split("")=0.000161 s  each_char=4.7e-5   s  3.4x faster
+n=1000    split("")=0.006684 s  each_char=0.004069 s  1.64x faster
+n=10000   split("")=1.246578 s  each_char=0.499156 s  2.5x faster
+n=100000  split("")=70.328609s  each_char=45.729214s  1.54x faster
 ```
 
 ## Run

@@ -1,12 +1,20 @@
-# CAT-047: Remove redundant upcase.downcase chain
+# CAT-047: Remove redundant `upcase.downcase` chain
 
-`upcase.downcase` cancels itself out but allocates intermediate strings.
+`upcase.downcase` allocates two intermediate strings while canceling itself out semantically.
+The final result is identical to the original string — but with unnecessary allocation and processing.
 
 ## Before / After
 
 ```crystal
 str.upcase.downcase  # → str
+str.downcase.upcase  # → str
 ```
+
+## Why this matters
+
+- **Unnecessary allocation**: Each call allocates a new String (up to 2x the original size).
+- **GC pressure**: Extra strings need garbage collection.
+- **Misleading intent**: Reader wonders why the casing transform is needed when it cancels out.
 
 ## Results (macOS ARM, Crystal 1.20.3)
 
