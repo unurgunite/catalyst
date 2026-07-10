@@ -18,9 +18,9 @@ n=10000   to_s=0.00022488s direct=0.00021625s 1.04x faster
 n=100000  to_s=0.00222817s direct=0.00217404s 1.02x faster
 ```
 
-Note: The compiler often optimizes away redundant `to_s` calls. The primary
-benefit is code clarity rather than performance.
-```
+> [!TIP]
+> The compiler often optimizes away redundant `to_s` calls. The primary
+> benefit is code clarity rather than performance.
 
 ## Run
 

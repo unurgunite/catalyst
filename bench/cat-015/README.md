@@ -28,6 +28,24 @@ The rule fires when:
 - Only accessor macros (`property`/`getter`/`setter`) and `def initialize`
 - No custom methods with logic
 
+## Results (macOS ARM, Crystal 1.20.3)
+
+```
+=== Struct vs Class: allocation and field access ===
+
+Creating 1000000 instances:
+
+  PointStruct.new(1, 2) x 1000000 = 0.0s
+  PointClass.new(1, 2) x 1000000   = 0.004046s
+  struct/class ratio: 0.0 (lower = struct faster)
+
+Field access (1000000 reads):
+
+  struct field read:   0.0s
+  class field read:    0.0s
+  struct/class ratio:  1.144 (lower = struct faster)
+```
+
 ## Run
 
 `crystal run bench/cat-015/bench_struct_vs_class.cr`

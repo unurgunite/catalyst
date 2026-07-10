@@ -25,9 +25,10 @@ n=10000   group_by+map+to_h=0.001847 s  counter_hash=0.002532 s  0.73x faster
 n=100000  group_by+map+to_h=0.018361 s  counter_hash=0.024196 s  0.76x faster
 ```
 
-Note: counter hash is faster only at n=10. At larger n, `group_by` is ~1.3x faster because Crystal's `group_by` uses
-internal optimizations. The `group_by` overhead of allocation is less than the hash lookup overhead in the counter loop
-for large datasets. Consider this rule's value context-dependent.
+> [!NOTE]
+> Counter hash is faster only at n=10. At larger n, `group_by` is ~1.3x faster because Crystal's `group_by` uses
+> internal optimizations. The `group_by` overhead of allocation is less than the hash lookup overhead in the counter loop
+> for large datasets. Consider this rule's value context-dependent.
 
 ## Run
 

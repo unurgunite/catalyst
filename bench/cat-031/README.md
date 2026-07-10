@@ -16,7 +16,11 @@ hash.has_value?("val")
 ## Results (macOS ARM, Crystal 1.20.3)
 
 ```
-=== Hash#values.includes? vs Hash#has_value? ===
+n=10      values.includes?=1.0e-6   s  has_value?=0.0      s  1.86x faster
+n=100     values.includes?=8.0e-6   s  has_value?=0.0      s  23.83x faster
+n=1000    values.includes?=0.000698 s  has_value?=0.0      s  2090.44x faster
+n=10000   values.includes?=0.054566 s  has_value?=0.0      s  163369.76x faster
+n=100000  values.includes?=11.669648s  has_value?=0.0      s  35043987.86x faster
 ```
 
 ## Run

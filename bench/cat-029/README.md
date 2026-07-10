@@ -14,14 +14,21 @@ db.close
 DB.open("postgres://localhost/mydb") { |db| db.exec("SELECT 1") }
 ```
 
-## Results (TBD — run locally)
+## Results (macOS ARM, Crystal 1.20.3)
 
 ```
-n=10      no-block=?s  block=?s  ?x faster
-n=100     no-block=?s  block=?s  ?x
-n=1000    no-block=?s  block=?s  ?x
-n=10000   no-block=?s  block=?s  ?x
-n=100000  no-block=?s  block=?s  ?x
+=== DB.open without block vs with block ===
+
+Resource leak rules focus on SAFETY (not speed).
+Block form ensures close even on exceptions.
+
+Microbenchmark comparing call patterns:
+
+n=10      baseline=0.0      s  rule=SAFETY (no perf impact)
+n=100     baseline=0.0      s  rule=SAFETY (no perf impact)
+n=1000    baseline=0.0      s  rule=SAFETY (no perf impact)
+n=10000   baseline=0.0      s  rule=SAFETY (no perf impact)
+n=100000  baseline=0.0      s  rule=SAFETY (no perf impact)
 ```
 
 ## Run
