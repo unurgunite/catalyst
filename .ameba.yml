@@ -1,0 +1,7 @@
+Lint/Formatting:
+  Enabled: false
+
+Globs:
+  - "**/*.cr"
+  - "!lib"
+  - "!bench/**/*.cr"
