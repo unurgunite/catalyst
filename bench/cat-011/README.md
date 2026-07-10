@@ -1,6 +1,7 @@
 # CAT-011: Combine multiple `gsub` calls into a single pass
 
-Chained `.gsub` calls iterate the string multiple times. A single `.gsub` with a hash argument does all replacements in one pass.
+Chained `.gsub` calls iterate the string multiple times. A single `.gsub` with a hash argument does all replacements in
+one pass.
 
 ## Before / After
 
@@ -18,7 +19,9 @@ n=1000    chained=0.005682s  single=0.001991s  2.85x faster
 n=10000   chained=0.055898s  single=0.019439s  2.88x faster
 ```
 
-Combined regex + hash is ~2.8x faster for moderate-to-large strings (n≥100). At very small sizes (n=10), the combined regex overhead slightly outweighs the benefit.
+> [!NOTE]
+> Combined regex + hash is ~2.8x faster for moderate-to-large strings (n≥100). At very small sizes (n=10), the combined
+> regex overhead slightly outweighs the benefit.
 
 ## Run
 

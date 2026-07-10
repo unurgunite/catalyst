@@ -25,7 +25,9 @@ n=10000   manual=0.000145s  block=8.3e-5s     1.75x faster
 n=100000  manual=0.001004s  block=0.00102s    0.98x faster
 ```
 
-Block form is slightly faster at lower iteration counts (no manual close branch). At 100K iterations both patterns converge (identical overhead).
+> [!IMPORTANT]
+> Primary value is **safety** (resource leak prevention), not speed.
+> Block form auto-closes even on exceptions, preventing file descriptor leaks.
 
 ## Run
 

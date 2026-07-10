@@ -27,7 +27,8 @@ n=10000   File.read_lines=1.203e-3s File.each_line=1.116e-3s 1.08x faster
 n=100000  File.read_lines=1.128e-2s File.each_line=1.1241e-2s 1.00x faster
 ```
 
-> **Note**: The main benefit of streaming is **memory efficiency**, not raw speed.
+> [!NOTE]
+> The main benefit of streaming is **memory efficiency**, not raw speed.
 > `File.read` loads the entire file into memory (O(n) memory), while `File.open` + `each_line`
 > processes line-by-line (O(1) memory). For very large files, streaming prevents OOM.
 

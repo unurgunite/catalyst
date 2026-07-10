@@ -36,7 +36,7 @@ module Catalyst
                 "driver" => {
                   "name"           => "catalyst",
                   "version"        => VERSION,
-                  "informationUri" => "https://catalyst.dev",
+                  "informationUri" => "https://github.com/unurgunite/catalyst",
                 },
               },
               "results" => results.map { |result|

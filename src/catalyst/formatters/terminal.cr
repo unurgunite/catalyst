@@ -23,7 +23,7 @@ module Catalyst
           if result.suggestion
             io.puts "  Suggestion: #{result.suggestion}"
           end
-          io.puts "  [help: https://catalyst.dev/rules/#{result.rule_id}]"
+          io.puts "  [help: https://github.com/unurgunite/catalyst/wiki/#{result.rule_id}]"
           io.puts
         end
 

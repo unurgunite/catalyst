@@ -11,8 +11,6 @@ ary.includes?(x)  # → set.includes?(x)  (with `set = ary.to_set` before the lo
 ## Results (macOS ARM, Crystal 1.20.3)
 
 ```
-
-```
 n=10      Array#include?=1.0e-6s   Set#include?=2.0e-6s   0.5x faster
 n=100     Array#include?=1.7e-5s   Set#include?=1.0e-5s   1.71x faster
 n=1000    Array#include?=0.001448s Set#include?=9.2e-5s   15.82x faster
