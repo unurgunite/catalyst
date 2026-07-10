@@ -45,7 +45,7 @@ module Catalyst
     end
 
     private def apply_fixes(results : Array(Result)) : Nil
-      fixable = results.select { |r| r.fix_replacement }
+      fixable = results.select(&.fix_replacement)
       return if fixable.empty?
 
       by_file = fixable.group_by(&.file)
@@ -54,11 +54,13 @@ module Catalyst
         source = File.read(file)
         lines = source.lines
 
-        file_results.sort_by! { |r| -r.line }
+        file_results.sort_by! { |result| -result.line }
 
         file_results.each do |result|
           next if result.line < 1 || result.line > lines.size
-          lines[result.line - 1] = result.fix_replacement.not_nil!
+          if replacement = result.fix_replacement
+            lines[result.line - 1] = replacement
+          end
         end
 
         backup = "#{file}.bak"

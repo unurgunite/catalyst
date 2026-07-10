@@ -44,9 +44,9 @@ module DocsGenerator
       io << "# Catalyst Rules\n\n"
       io << "| ID | Rule | Severity | Confidence | Fix |\n"
       io << "|----|------|----------|------------|-----|\n"
-      rules.each do |r|
-        fix = r.auto_fixable? ? "✅" : "❌"
-        io << "| #{r.id} | #{r.description} | #{r.severity} | #{r.confidence} | #{fix} |\n"
+      rules.each do |rule|
+        fix = rule.auto_fixable? ? "✅" : "❌"
+        io << "| #{rule.id} | #{rule.description} | #{rule.severity} | #{rule.confidence} | #{fix} |\n"
       end
       io << "\nTotal rules: #{rules.size}\n"
     end
