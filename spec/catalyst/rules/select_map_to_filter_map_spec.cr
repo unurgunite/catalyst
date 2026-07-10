@@ -2,8 +2,8 @@ require "../../spec_helper"
 
 module Catalyst
   module Rules
-    describe SelectMapToFilterMap do
-      rule = SelectMapToFilterMap.new
+    describe SelectMapToCompactMap do
+      rule = SelectMapToCompactMap.new
 
       describe "#check" do
         it "detects select{}.map{}" do
@@ -26,8 +26,8 @@ module Catalyst
           assert_no_finding(rule, "[1, 2, 3].select { |x| x > 0 }")
         end
 
-        it "ignores filter_map (already optimal)" do
-          assert_no_finding(rule, "[1, 2, 3].filter_map { |x| x * 2 if x > 0 }")
+        it "ignores compact_map (already optimal)" do
+          assert_no_finding(rule, "[1, 2, 3].compact_map { |x| x * 2 if x > 0 }")
         end
 
         it "ignores reject.map (different inner method)" do
@@ -49,7 +49,7 @@ module Catalyst
 
       describe "#description" do
         it "returns description text" do
-          rule.description.should contain("filter_map")
+          rule.description.should contain("compact_map")
           rule.description.should contain("select")
           rule.description.should contain("map")
         end
