@@ -2,6 +2,8 @@
 
 Power operator `**` is more general and may not inline as well. `x * x` and `Math.sqrt(x)` are more idiomatic and LLVM can optimize better.
 
+> **Caveat**: Benchmarks show ~1x difference — LLVM optimizes both forms to identical machine code in most cases. This is an **educational/style rule**, not a performance optimisation. Confidence lowered to `low`.
+
 ## Before / After
 
 ```crystal

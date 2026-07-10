@@ -18,10 +18,11 @@ n=10000   concat=0.00107708s build=0.0012105s  0.89x faster
 n=100000  concat=0.00958562s build=0.01187529s 0.81x faster
 ```
 
-Note: For simple literal concatenation, Crystal's compiler optimizes constants
-at compile time. The benefit of `String.build` is more pronounced with variable
-interpolation or in loops with dynamic values.
-```
+> **Caveat**: For simple literal concatenation, Crystal's compiler optimizes constants
+> at compile time — `"a" + "b"` is the same as `String.build { ... }`.
+> The rule is useful mainly for **dynamic strings in loops** where intermediate
+> allocations matter. Confidence lowered to `low` because of high false-positive
+> rate on literal-only concatenation.
 
 ## Run
 

@@ -35,7 +35,7 @@ module Catalyst
             line: line,
             column: col,
             suggestion: "Replace `x ** 2` with `x * x`",
-            confidence: "high",
+            confidence: "low",
           )]
         when "0.5"
           [Result.new(
@@ -46,7 +46,7 @@ module Catalyst
             line: line,
             column: col,
             suggestion: "Replace `x ** 0.5` with `Math.sqrt(x)`",
-            confidence: "high",
+            confidence: "low",
           )]
         else
           [] of Result

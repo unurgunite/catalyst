@@ -2,6 +2,8 @@
 
 Large union types (4+ types) in method return signatures force the compiler to generate larger dispatch tables and can indicate over-general APIs. Consider refactoring with a sealed class/struct hierarchy or protocol instead.
 
+> **Caveat**: This rule targets **compile-time performance** (compiler speed, binary size), not runtime. The benchmark measures AST parsing overhead, not execution speed. Marginal rule — useful for large codebases but low priority for small projects.
+
 ## Before / After
 
 ```crystal

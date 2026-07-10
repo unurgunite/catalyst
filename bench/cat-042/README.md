@@ -2,6 +2,8 @@
 
 `sleep(0)` is misleading — it suggests a time delay when the intent is to yield control to other fibers. `Fiber.yield` expresses this directly.
 
+> **Caveat**: Performance is identical (`sleep(0)` ≈ `Fiber.yield`). This is a **clarity rule** — no measurable speed gain. Useful for code intent, not optimization.
+
 ## Before / After
 
 ```crystal

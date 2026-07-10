@@ -29,7 +29,7 @@ module Catalyst
           line: line,
           column: col,
           suggestion: "Use `String.build` block to accumulate string fragments",
-          confidence: "medium"
+          confidence: "low"
         )]
       end
 
