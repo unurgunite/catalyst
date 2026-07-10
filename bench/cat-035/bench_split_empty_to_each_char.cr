@@ -4,7 +4,7 @@ puts "=== String#split(\"\") vs String#each_char ==="
 puts ""
 
 [10, 100, 1_000, 10_000, 100_000].each do |n|
-  str = "helloabcdefghij" * (n / 14 + 1)
+  str = "helloabcdefghij" * (n // 14 + 1)
 
   split = Benchmark.measure { n.times { str.split("") } }
   each_char = Benchmark.measure { n.times { str.each_char.to_a } }

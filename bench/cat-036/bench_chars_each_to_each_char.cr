@@ -4,7 +4,7 @@ puts "=== String#chars.each vs String#each_char ==="
 puts ""
 
 [10, 100, 1_000, 10_000, 100_000].each do |n|
-  str = "helloabcdefghij" * (n / 14 + 1)
+  str = "helloabcdefghij" * (n // 14 + 1)
 
   chars_each = Benchmark.measure { n.times { str.chars.each { |c| c } } }
   each_char = Benchmark.measure { n.times { str.each_char { |c| c } } }

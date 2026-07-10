@@ -4,7 +4,7 @@ puts "=== String#split(x)[0] vs String#split(x, 2)[0] ==="
 puts ""
 
 [10, 100, 1_000, 10_000, 100_000].each do |n|
-  str = "a,b,c,d,e,f,g,h,i,j" * (n / 10 + 1)
+  str = "a,b,c,d,e,f,g,h,i,j" * (n // 10 + 1)
 
   no_limit = Benchmark.measure { n.times { str.split(",")[0] } }
   with_limit = Benchmark.measure { n.times { str.split(",", 2)[0] } }
