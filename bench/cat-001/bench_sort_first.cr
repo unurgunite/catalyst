@@ -26,5 +26,3 @@ puts ""
 
   puts "n=#{n.to_s.ljust(6)}  sort.last=#{sort_last.real.round(6).to_s.ljust(9)}s  max=#{max_val.real.round(6).to_s.ljust(9)}s  #{ratio}x faster"
 end
-
-
