@@ -13,6 +13,10 @@ module Catalyst
         "Hoist `Regex.new` out of loop to a constant"
       end
 
+      def auto_fixable? : Bool
+        true
+      end
+
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         return [] of Result unless node.is_a?(Crystal::Call)
         return [] of Result unless node.name == "new" || node.name == "compile"

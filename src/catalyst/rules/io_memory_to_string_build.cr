@@ -17,6 +17,10 @@ module Catalyst
         "Use `String.build` instead of `IO::Memory.new` + `.to_s`"
       end
 
+      def auto_fixable? : Bool
+        true
+      end
+
       # Check if node is a call to `to_s` or `to_string` on an `IO::Memory.new` chain.
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         call = io_memory_to_call(node)

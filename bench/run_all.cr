@@ -72,10 +72,10 @@ dirs.each do |dir|
     best_ratio = ratios.max? || 0.0
 
     results << {
-      rule: rule,
+      rule:        rule,
       description: description,
-      best_ratio: best_ratio,
-      category: category,
+      best_ratio:  best_ratio,
+      category:    category,
     }
   end
 end

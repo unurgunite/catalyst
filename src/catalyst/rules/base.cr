@@ -77,6 +77,8 @@ module Catalyst
     property suggestion : String?
     # # Confidence: low, medium, or high.
     property confidence : String
+    # # Optional replacement text for entire line when auto-fixing.
+    property fix_replacement : String?
 
     def initialize(
       @rule_id : String,
@@ -87,6 +89,7 @@ module Catalyst
       @column : Int32 = 0,
       @suggestion : String? = nil,
       @confidence : String = "medium",
+      @fix_replacement : String? = nil,
     )
     end
   end

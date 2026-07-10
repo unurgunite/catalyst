@@ -18,6 +18,10 @@ module Catalyst
         "Use `Time.utc` instead of `Time.local` when local timezone is not required"
       end
 
+      def auto_fixable? : Bool
+        true
+      end
+
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         return [] of Result unless node.is_a?(Crystal::Call)
         return [] of Result unless node.name == "local"
@@ -26,6 +30,8 @@ module Catalyst
 
         line = node.location.try(&.line_number) || 0
         col = node.name_location.try(&.column_number) || 0
+        line_text = context.line_text(line)
+        fix = line_text.gsub("Time.local", "Time.utc")
 
         [Result.new(
           rule_id: id,
@@ -35,7 +41,8 @@ module Catalyst
           line: line,
           column: col,
           suggestion: "Replace `Time.local(...)` with `Time.utc(...)`",
-          confidence: "medium"
+          confidence: "medium",
+          fix_replacement: fix,
         )]
       end
 

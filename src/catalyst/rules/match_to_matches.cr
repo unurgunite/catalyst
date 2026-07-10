@@ -13,6 +13,10 @@ module Catalyst
         "Use `matches?` instead of `match` or `=~` for boolean context"
       end
 
+      def auto_fixable? : Bool
+        true
+      end
+
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         call = match_or_match_operator_call(node)
         return [] of Result unless call
