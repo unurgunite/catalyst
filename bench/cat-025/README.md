@@ -14,14 +14,17 @@ f.close
 File.open("file.txt") { |f| f.gets }
 ```
 
-## Results (TBD — run locally)
+## Results (macOS ARM, Crystal 1.20.3)
 
 ```
-n=10      no-block=?s  block=?s  ?x faster
-n=100     no-block=?s  block=?s  ?x
-n=1000    no-block=?s  block=?s  ?x
-n=10000   no-block=?s  block=?s  ?x
-n=100000  no-block=?s  block=?s  ?x
+
+=== File.open vs File.open with block (microbenchmark) ===
+
+n=10      manual=0.000172 s  block=9.0e-5   s  1.91x faster
+n=100     manual=0.000889 s  block=0.000763 s  1.16x faster
+n=1000    manual=0.007029 s  block=0.006703 s  1.05x faster
+n=10000   manual=0.068794 s  block=0.070376 s  0.98x faster
+n=100000  manual=0.701708 s  block=0.686076 s  1.02x faster
 ```
 
 ## Run

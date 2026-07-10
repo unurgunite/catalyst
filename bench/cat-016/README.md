@@ -16,6 +16,15 @@ def handle(value : Int32 | String) : Int32 | String
 end
 ```
 
+## Results (macOS ARM, Crystal 1.20.3)
+
+```
+=== LargeUnionTypes rule benchmark ===
+
+def with 4-type union 767.56k (  1.30µs) (± 2.23%)   4.2kB/op   1.75× slower
+ def with single type   1.35M (742.56ns) (± 1.72%)  2.79kB/op        fastest
+```
+
 ## Run
 
 `crystal run bench/cat-016/bench_large_union_types.cr`

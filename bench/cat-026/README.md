@@ -14,14 +14,16 @@ d.close
 Dir.open(".") { |d| d.entries }
 ```
 
-## Results (TBD — run locally)
+## Results (macOS ARM, Crystal 1.20.3)
 
 ```
-n=10      no-block=?s  block=?s  ?x faster
-n=100     no-block=?s  block=?s  ?x
-n=1000    no-block=?s  block=?s  ?x
-n=10000   no-block=?s  block=?s  ?x
-n=100000  no-block=?s  block=?s  ?x
+=== Dir.open vs Dir.open with block ===
+
+n=10      manual=0.000102 s  block=7.8e-5   s  1.3x faster
+n=100     manual=0.000664 s  block=0.000624 s  1.06x faster
+n=1000    manual=0.005754 s  block=0.005796 s  0.99x faster
+n=10000   manual=0.060458 s  block=0.061427 s  0.98x faster
+n=100000  manual=0.594606 s  block=0.623934 s  0.95x faster
 ```
 
 ## Run

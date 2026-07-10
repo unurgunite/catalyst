@@ -14,14 +14,14 @@ f.close
 Tempfile.new("data") { |f| f.puts "hello" }
 ```
 
-## Results (TBD — run locally)
+## Results (macOS ARM, Crystal 1.20.3)
 
 ```
-n=10      no-block=?s  block=?s  ?x faster
-n=100     no-block=?s  block=?s  ?x
-n=1000    no-block=?s  block=?s  ?x
-n=10000   no-block=?s  block=?s  ?x
-n=100000  no-block=?s  block=?s  ?x
+=== Tempfile.new vs Tempfile.open block (microbenchmark) ===
+
+n=10      manual=0.000828 s  block=0.000568 s  1.46x faster
+n=100     manual=0.005711 s  block=0.00449  s  1.27x faster
+n=1000    manual=0.076081 s  block=0.057285 s  1.33x faster
 ```
 
 ## Run
