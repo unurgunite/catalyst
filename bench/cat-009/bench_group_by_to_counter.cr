@@ -4,7 +4,8 @@ puts "=== group_by{}.map{}.size vs counter hash ==="
 puts ""
 
 [10, 100, 1_000, 10_000, 100_000].each do |n|
-  words = (1..n).map { |i| "word_#{i % (n / 10)}" }
+  num_groups = {n // 10, 1}.max
+  words = (1..n).map { |i| "word_#{i % num_groups}" }
 
   group_by = Benchmark.measure do
     counts = words.group_by { |w| w }.map { |k, v| {k, v.size} }.to_h

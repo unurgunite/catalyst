@@ -8,12 +8,12 @@ puts ""
   n.times { |i| hash[i] = i * 2 }
 
   values_each = Benchmark.measure do
-    sum = 0
+    sum = 0_i64
     hash.values.each { |v| sum += v }
   end
 
   each_value = Benchmark.measure do
-    sum = 0
+    sum = 0_i64
     hash.each_value { |v| sum += v }
   end
 
