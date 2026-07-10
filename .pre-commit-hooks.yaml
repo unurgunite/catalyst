@@ -1,0 +1,7 @@
+- id: catalyst
+  name: Catalyst
+  description: "Static performance analysis for Crystal"
+  entry: bin/catalyst-pre-commit
+  language: script
+  files: \.cr$
+  minimum_pre_commit_version: "2.9.0"

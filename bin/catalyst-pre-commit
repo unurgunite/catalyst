@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Catalyst pre-commit hook
+# Runs catalyst on staged .cr files
+set -euo pipefail
+
+FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep '\.cr$' || true)
+if [ -z "$FILES" ]; then
+  exit 0
+fi
+
+# Build if not exists
+if [ ! -f bin/catalyst ]; then
+  crystal build src/catalyst.cr --release -o bin/catalyst 2>/dev/null
+fi
+
+exec bin/catalyst --ci $FILES
