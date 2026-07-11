@@ -37,7 +37,38 @@ module Catalyst
         end
       end
 
+      if @options.fix?
+        apply_fixes(results)
+      end
+
       results
+    end
+
+    private def apply_fixes(results : Array(Result)) : Nil
+      fixable = results.select(&.fix_replacement)
+      return if fixable.empty?
+
+      by_file = fixable.group_by(&.file)
+
+      by_file.each do |file, file_results|
+        source = File.read(file)
+        lines = source.lines
+
+        file_results.sort_by! { |result| -result.line }
+
+        file_results.each do |result|
+          next if result.line < 1 || result.line > lines.size
+          if replacement = result.fix_replacement
+            lines[result.line - 1] = replacement
+          end
+        end
+
+        backup = "#{file}.bak"
+        File.copy(file, backup)
+
+        File.write(file, lines.join("\n"))
+        STDOUT.puts "catalyst: fixed #{file} (backup: #{backup})"
+      end
     end
 
     private def collect_files(paths : Array(String)) : Array(String)

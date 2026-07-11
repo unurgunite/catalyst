@@ -20,6 +20,10 @@ module Catalyst
         "Use `find`/`find!` instead of `select`/`filter` + `first`/`first?`"
       end
 
+      def auto_fixable? : Bool
+        true
+      end
+
       # # Check if node is `select{}.first` / `select{}.first?`.
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         call = select_first_call(node)
@@ -29,6 +33,9 @@ module Catalyst
 
         line = call.location.try(&.line_number) || 0
         col = call.name_location.try(&.column_number) || 0
+        line_text = context.line_text(line)
+        fix = line_text.sub(/\.(?:select|filter)(\s*\{.*\})\s*\.(?:first|first\?)/) { ".#{replacement}#{$1}" }
+        fix = nil if fix == line_text
 
         [Result.new(
           rule_id: id,
@@ -39,6 +46,7 @@ module Catalyst
           column: col,
           suggestion: "Replace `select{}/filter{}.#{call.name}` with `#{replacement}`",
           confidence: "high",
+          fix_replacement: fix,
         )]
       end
 

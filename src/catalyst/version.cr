@@ -1,4 +1,4 @@
 module Catalyst
   # # Current version of Catalyst (SemVer).
-  VERSION = "0.1.0"
+  VERSION = "0.2.1"
 end

@@ -17,6 +17,10 @@ module Catalyst
         "Use `each_key` instead of `keys.each`"
       end
 
+      def auto_fixable? : Bool
+        true
+      end
+
       # # Check if node is `hash.keys.each`.
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         call = keys_each_call(node)
@@ -24,6 +28,8 @@ module Catalyst
 
         line = call.location.try(&.line_number) || 0
         col = call.name_location.try(&.column_number) || 0
+        line_text = context.line_text(line)
+        fix = line_text.gsub(".keys.each", ".each_key")
 
         [Result.new(
           rule_id: id,
@@ -33,7 +39,8 @@ module Catalyst
           line: line,
           column: col,
           suggestion: "Replace `keys.each` with `each_key`",
-          confidence: "high"
+          confidence: "high",
+          fix_replacement: fix,
         )]
       end
 

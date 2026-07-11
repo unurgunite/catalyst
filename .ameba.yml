@@ -5,3 +5,4 @@ Globs:
   - "**/*.cr"
   - "!lib"
   - "!bench/**/*.cr"
+  - "!hello_enterprise/**/*.cr"
