@@ -2,12 +2,7 @@
 /bin/catalyst.exe
 /bin/ameba
 /bin/ameba.exe
-/bin/generate_docs
 /lib/
-hello_enterprise/
-*.txt
-build_categorization.py
-docs/rules/
 /docs/
 
 # Crystal
