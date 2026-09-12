@@ -15,9 +15,11 @@ module Catalyst
     def run(paths : Array(String)) : Array(Result)
       files = collect_files(paths)
       results = [] of Result
+      sources = {} of String => Array(String)
 
       files.each do |file|
         source = File.read(file)
+        sources[file] = source.lines
         context = Context.new(file, source)
 
         @rules.each(&.setup(file, source))
@@ -35,11 +37,44 @@ module Catalyst
         STDOUT.puts "catalyst: error processing #{file}: #{ex.message}"
       end
 
+      results = suppress_inline(results, sources)
+
+      if update_path = @options.update_baseline
+        count = Baseline.write(update_path, results)
+        STDOUT.puts "catalyst: wrote #{count} findings to #{update_path}"
+      end
+
+      if baseline_path = (@options.update_baseline || @options.baseline)
+        known = Baseline.load(baseline_path)
+        results = Baseline.new_findings(results, known)
+      end
+
       if @options.fix?
         apply_fixes(results)
       end
 
       results
+    end
+
+    # # Drop findings silenced by `# catalyst:disable` comments placed
+    # # on the finding's line or the line directly above it. A bare
+    # # directive silences all rules; otherwise it lists rule IDs.
+    private def suppress_inline(results : Array(Result), sources : Hash(String, Array(String))) : Array(Result)
+      results.reject do |result|
+        lines = sources[result.file]? || [] of String
+        suppressed?(lines, result)
+      end
+    end
+
+    private def suppressed?(lines : Array(String), result : Result) : Bool
+      [result.line, result.line - 1].each do |lineno|
+        next if lineno < 1 || lineno > lines.size
+        if match = lines[lineno - 1].match(/#\s*catalyst:disable\b(.*)$/)
+          ids = match[1].split(/[\s,]+/).reject(&.empty?)
+          return true if ids.empty? || ids.includes?(result.rule_id)
+        end
+      end
+      false
     end
 
     private def apply_fixes(results : Array(Result)) : Nil
