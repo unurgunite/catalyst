@@ -6,24 +6,24 @@ module Catalyst
       rule = ShiftUnshiftToDeque.new
 
       describe "#check" do
-        it "detects .shift" do
-          assert_finding(rule, "[1, 2, 3].shift")
+        it "detects .shift inside loop" do
+          assert_finding(rule, "items.each { |i| queue.shift }")
         end
 
-        it "detects .unshift" do
-          assert_finding(rule, "[1, 2, 3].unshift(0)")
+        it "detects .unshift inside loop" do
+          assert_finding(rule, "while active\n  queue.unshift(item)\nend")
         end
 
-        it "detects .shift on method chain" do
-          assert_finding(rule, "ary.map(&.to_s).shift")
+        it "ignores top-level .shift (e.g. CLI args)" do
+          assert_no_finding(rule, "args.shift")
         end
 
-        it "detects .unshift with multiple args" do
-          assert_finding(rule, "ary.unshift(1, 2, 3)")
+        it "ignores .unshift outside loops" do
+          assert_no_finding(rule, "[1, 2, 3].unshift(0)")
         end
 
-        it "detects .shift on variable" do
-          assert_finding(rule, "ary = [1, 2, 3]\nary.shift")
+        it "ignores .shift on variable outside loops" do
+          assert_no_finding(rule, "ary = [1, 2, 3]\nary.shift")
         end
 
         it "ignores .push (not shift/unshift)" do
