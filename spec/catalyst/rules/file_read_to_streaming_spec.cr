@@ -45,6 +45,17 @@ module Catalyst
         it "ignores File.delete" do
           assert_no_finding(rule, %(File.delete("foo.txt")))
         end
+
+        it "ignores whole reads of config files" do
+          assert_no_finding(rule, %(File.read("config/settings.yml")))
+          assert_no_finding(rule, %(File.read("data.json")))
+          assert_no_finding(rule, %(File.read_lines("app.toml")))
+        end
+
+        it "ignores reads feeding config parsing" do
+          assert_no_finding(rule, %(AppConfig.from_yaml(File.read(CONFIG_PATH))))
+          assert_no_finding(rule, %(cfg = Config.from_json(File.read(path))))
+        end
       end
 
       describe "#id" do
