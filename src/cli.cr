@@ -31,7 +31,8 @@ module Catalyst
       end
 
       if Rule.all.empty?
-        STDERR.puts "catalyst: no rules loaded — refusing to report a clean result (broken build?)"
+        STDERR.puts "catalyst: no rules loaded — refusing to report a clean result."
+        STDERR.puts "catalyst: hint: rebuild from the repository root (`crystal build src/catalyst.cr`), then retry."
         return 2
       end
 
