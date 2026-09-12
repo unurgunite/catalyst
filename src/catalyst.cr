@@ -19,4 +19,10 @@ require "./cli"
 module Catalyst
 end
 
-Catalyst::CLI.run(ARGV)
+{% unless parse_type("Spec").resolve? %}
+  # Exit with the CLI status code when built as a binary.
+  # Skipped when required from specs so `crystal spec` keeps working.
+  exit(Catalyst::CLI.run(ARGV))
+{% else %}
+  Catalyst::CLI.run(ARGV)
+{% end %}

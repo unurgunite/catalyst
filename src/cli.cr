@@ -30,6 +30,11 @@ module Catalyst
         return 0
       end
 
+      if Rule.all.empty?
+        STDERR.puts "catalyst: no rules loaded — refusing to report a clean result (broken build?)"
+        return 2
+      end
+
       config = ConfigLoader.load(config_path)
       runner = Runner.new(config, options)
       results = runner.run(args)
