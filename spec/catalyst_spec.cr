@@ -9,4 +9,14 @@ describe Catalyst do
     config = Catalyst::Config.load("/nonexistent/.catalyst.yml")
     config.severity.should eq("warning")
   end
+
+  it "refuses to run with an empty rule registry" do
+    saved = Catalyst::Rule.all.dup
+    begin
+      Catalyst::Rule.all.clear
+      Catalyst::CLI.run(["src/"]).should eq(2)
+    ensure
+      Catalyst::Rule.all.concat(saved)
+    end
+  end
 end

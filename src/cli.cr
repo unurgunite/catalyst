@@ -20,6 +20,8 @@ module Catalyst
         parser.on("--ci", "CI mode — exit code 1 on any finding") { options.ci = true }
         parser.on("--rules RULES", "Comma-separated rule IDs to enable") { |v| options.rules = v.split(",") }
         parser.on("--ignore RULES", "Comma-separated rule IDs to disable") { |v| options.ignore = v.split(",") }
+        parser.on("--baseline PATH", "Report only findings absent from baseline file") { |v| options.baseline = v }
+        parser.on("--update-baseline PATH", "Write current findings as baseline, then report only new ones") { |v| options.update_baseline = v }
         parser.on("--list-rules", "List all available rules and exit") { options.list_rules = true }
         parser.on("--version", "Show version") { puts "catalyst v#{VERSION}"; exit 0 }
         parser.on("-h", "--help", "Show help") { puts parser; exit 0 }
@@ -28,6 +30,12 @@ module Catalyst
       if options.list_rules?
         list_rules
         return 0
+      end
+
+      if Rule.all.empty?
+        STDERR.puts "catalyst: no rules loaded — refusing to report a clean result."
+        STDERR.puts "catalyst: hint: rebuild from the repository root (`crystal build src/catalyst.cr`), then retry."
+        return 2
       end
 
       config = ConfigLoader.load(config_path)
@@ -69,6 +77,10 @@ module Catalyst
     property rules : Array(String)? = nil
     # # Comma-separated rule IDs to disable (optional).
     property ignore : Array(String)? = nil
+    # # Baseline file path: report only findings absent from it.
+    property baseline : String? = nil
+    # # Baseline file path to (re)write from current findings.
+    property update_baseline : String? = nil
     # # List all rules and exit.
     property? list_rules : Bool = false
   end

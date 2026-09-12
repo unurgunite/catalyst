@@ -10,8 +10,25 @@ module Catalyst
           assert_finding(rule, "ary.includes?(x)")
         end
 
-        it "detects array literal includes?" do
-          assert_finding(rule, "[1, 2, 3].includes?(1)")
+        it "ignores small array literal outside loops" do
+          assert_no_finding(rule, "[1, 2, 3].includes?(1)")
+        end
+
+        it "detects small array literal inside loops" do
+          assert_finding(rule, "items.each { |i| [1, 2, 3].includes?(i) }")
+        end
+
+        it "ignores Range#include? (already O(1))" do
+          assert_no_finding(rule, "(1..512).includes?(threads)")
+          assert_no_finding(rule, "1..512.includes?(threads)")
+        end
+
+        it "ignores small word literal outside loops" do
+          assert_no_finding(rule, "%w[none warning info debug].includes?(level)")
+        end
+
+        it "detects includes? inside while loop" do
+          assert_finding(rule, "while running\n  list.includes?(item)\nend")
         end
 
         it "detects includes? with string arg" do
