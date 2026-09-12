@@ -33,7 +33,7 @@ module Catalyst
       end
 
       private def filter_by_severity(results : Array(Result), min_severity : String) : Array(Result)
-        levels = %w(error warning info hint)
+        levels = %w[error warning info hint]
         min_idx = levels.index(min_severity) || 0
         results.select { |result| (levels.index(result.severity) || 0) >= min_idx }
       end

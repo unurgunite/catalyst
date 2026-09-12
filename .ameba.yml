@@ -1,6 +1,14 @@
 Lint/Formatting:
   Enabled: false
 
+# TODO: new cops in ameba 1.7.0, mass noise on current style.
+# Revisit as separate style-migration change.
+Style/RedundantNilInControlExpression:
+  Enabled: false
+
+Style/RedundantSelf:
+  Enabled: false
+
 Globs:
   - "**/*.cr"
   - "!lib"

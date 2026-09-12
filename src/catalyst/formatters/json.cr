@@ -11,7 +11,7 @@ module Catalyst
       end
 
       private def severity_level(severity : String) : Int32
-        %w(error warning info hint).index(severity) || 0
+        %w[error warning info hint].index(severity) || 0
       end
     end
 
@@ -39,7 +39,7 @@ module Catalyst
                   "informationUri" => "https://github.com/unurgunite/catalyst",
                 },
               },
-              "results" => results.map { |result|
+              "results" => results.map do |result|
                 {
                   "ruleId"    => result.rule_id,
                   "level"     => result.severity == "error" ? "error" : "warning",
@@ -56,14 +56,14 @@ module Catalyst
                     },
                   ],
                 }
-              },
+              end,
             },
           ],
         }
       end
 
       private def severity_level(severity : String) : Int32
-        %w(error warning info hint).index(severity) || 0
+        %w[error warning info hint].index(severity) || 0
       end
     end
   end
