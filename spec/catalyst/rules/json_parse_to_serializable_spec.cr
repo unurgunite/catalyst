@@ -14,12 +14,12 @@ module Catalyst
           assert_finding(rule, %(JSON.parse(raw).as_a))
         end
 
-        it "detects standalone JSON.parse(str)" do
-          assert_finding(rule, %(JSON.parse(raw)))
+        it "ignores standalone JSON.parse(str) (unknown schema)" do
+          assert_no_finding(rule, %(JSON.parse(raw)))
         end
 
-        it "detects JSON.parse with method call result" do
-          assert_finding(rule, %(data = JSON.parse(raw); data.as_h))
+        it "ignores JSON.parse assigned without inline cast" do
+          assert_no_finding(rule, %(data = JSON.parse(raw); data.as_h))
         end
 
         it "ignores JSON.parse with block" do

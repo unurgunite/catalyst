@@ -32,6 +32,12 @@ module Catalyst
         return 0
       end
 
+      if Rule.all.empty?
+        STDERR.puts "catalyst: no rules loaded — refusing to report a clean result."
+        STDERR.puts "catalyst: hint: rebuild from the repository root (`crystal build src/catalyst.cr`), then retry."
+        return 2
+      end
+
       config = ConfigLoader.load(config_path)
       runner = Runner.new(config, options)
       results = runner.run(args)

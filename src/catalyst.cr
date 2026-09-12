@@ -20,4 +20,19 @@ require "./cli"
 module Catalyst
 end
 
-Catalyst::CLI.run(ARGV)
+{% unless parse_type("Spec").resolve? %}
+  # Act as the CLI entrypoint only when this file is the program being run
+  # (built `catalyst` binary, including `catalyst.exe`, or
+  # `crystal run src/catalyst.cr`). When required from other programs
+  # (generate_docs, custom tooling) preserve the old call-and-ignore
+  # behavior so their own entrypoints keep working.
+  entry = File.basename(PROGRAM_NAME, File.extname(PROGRAM_NAME))
+  if entry.ends_with?("catalyst") || entry.starts_with?("crystal-run-catalyst")
+    exit(Catalyst::CLI.run(ARGV))
+  else
+    Catalyst::CLI.run(ARGV)
+  end
+{% else %}
+  # Required from specs: run without exiting so `crystal spec` keeps working.
+  Catalyst::CLI.run(ARGV)
+{% end %}
