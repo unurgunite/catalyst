@@ -17,24 +17,22 @@ module Catalyst
       results = [] of Result
 
       files.each do |file|
-        begin
-          source = File.read(file)
-          context = Context.new(file, source)
+        source = File.read(file)
+        context = Context.new(file, source)
 
-          @rules.each(&.setup(file, source))
+        @rules.each(&.setup(file, source))
 
-          parser = Crystal::Parser.new(source)
-          nodes = parser.parse
+        parser = Crystal::Parser.new(source)
+        nodes = parser.parse
 
-          visitor = Visitors::FileVisitor.new(@rules, context)
-          nodes.accept(visitor)
+        visitor = Visitors::FileVisitor.new(@rules, context)
+        nodes.accept(visitor)
 
-          results.concat(visitor.results)
-        rescue ex : Crystal::SyntaxException
-          STDOUT.puts "catalyst: parse error in #{file}: #{ex.message}"
-        rescue ex
-          STDOUT.puts "catalyst: error processing #{file}: #{ex.message}"
-        end
+        results.concat(visitor.results)
+      rescue ex : Crystal::SyntaxException
+        STDOUT.puts "catalyst: parse error in #{file}: #{ex.message}"
+      rescue ex
+        STDOUT.puts "catalyst: error processing #{file}: #{ex.message}"
       end
 
       if @options.fix?
