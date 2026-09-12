@@ -27,13 +27,13 @@ module Catalyst
 
     # # Return default config with sensible defaults.
     def self.default : Config
-      Config.from_yaml(%(
+      Config.from_yaml(<<-YAML)
         severity: warning
         format: terminal
         rules: {}
         ignore: []
         paths: []
-      ))
+        YAML
     end
 
     # # Load config from YAML file path. Fallback to default if missing.
