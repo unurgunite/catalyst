@@ -42,6 +42,10 @@ catalyst --fix src/
 # Enable only specific rules
 catalyst --rules CAT-001,CAT-002 src/
 
+# Gate on new findings only (baseline workflow)
+catalyst --update-baseline .catalyst-baseline.json src/
+catalyst --baseline .catalyst-baseline.json --ci src/
+
 # List all rules
 catalyst --list-rules
 ```

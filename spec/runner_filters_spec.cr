@@ -17,7 +17,7 @@ private def config_with_rules(rules_yaml : String) : Catalyst::Config
   Catalyst::Config.from_yaml("severity: warning\nformat: terminal\nrules:\n#{rules_yaml}ignore: []\npaths: []\n")
 end
 
-FIXTURE_CODE = "[3, 1, 2].sort.first\n[1].includes?(1)\n"
+FIXTURE_CODE = "[3, 1, 2].sort.first\nitems.each { |i| list.includes?(i) }\n"
 
 describe Catalyst::Runner do
   it "runs all rules by default" do
