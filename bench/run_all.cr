@@ -27,7 +27,8 @@ category_map = {
   "cat-012" => "serialization",
   "cat-037" => "logging", "cat-038" => "performance",
   "cat-042" => "concurrency", "cat-043" => "random",
-  "cat-044" => "math", "cat-049" => "concurrency",
+  "cat-044" => "math", "cat-045" => "error-handling",
+  "cat-049" => "concurrency",
   "cat-050" => "concurrency",
 }
 
@@ -80,7 +81,7 @@ dirs.each do |dir|
   end
 end
 
-category_order = ["array", "hash", "string", "io", "resource", "type", "time", "serialization", "logging", "performance", "concurrency", "random", "math", "other"]
+category_order = ["array", "hash", "string", "io", "resource", "type", "time", "serialization", "logging", "performance", "concurrency", "random", "math", "error-handling", "other"]
 
 sorted_results = results.sort do |a, b|
   cat_cmp = (category_order.index(a[:category]) || 99) <=> (category_order.index(b[:category]) || 99)
