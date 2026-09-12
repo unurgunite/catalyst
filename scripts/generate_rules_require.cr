@@ -9,7 +9,9 @@
 # (`\a`, `\c`, … are read as glob escapes and match nothing).
 rules_dir = File.expand_path(File.join(__DIR__, "..", "src", "catalyst", "rules")).gsub("\\", "/")
 
-rule_files = Dir.glob(File.join(rules_dir, "*.cr")).sort
+# NOTE: no File.join here — it would reintroduce a backslash separator
+# on Windows and break the glob again.
+rule_files = Dir.glob("#{rules_dir}/*.cr").sort
 
 if rule_files.empty?
   STDERR.puts "generate_rules_require: no rule files found in #{rules_dir}"
