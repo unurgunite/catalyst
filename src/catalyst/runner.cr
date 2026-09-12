@@ -75,10 +75,13 @@ module Catalyst
     private def collect_files(paths : Array(String)) : Array(String)
       files = [] of String
       paths.each do |path|
-        if File.directory?(path)
-          Dir.glob(File.join(path, "**", "*.cr")).each { |file| files << file }
-        elsif File.file?(path) && path.ends_with?(".cr")
-          files << path
+        # Forward slashes: Dir.glob treats backslashes as escapes, so
+        # Windows paths must be normalized before globbing.
+        normalized = path.gsub("\\", "/")
+        if File.directory?(normalized)
+          Dir.glob(File.join(normalized, "**", "*.cr")).each { |file| files << file }
+        elsif File.file?(normalized) && normalized.ends_with?(".cr")
+          files << normalized
         end
       end
       files.reject! do |file|
