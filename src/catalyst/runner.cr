@@ -79,7 +79,9 @@ module Catalyst
         # Windows paths must be normalized before globbing.
         normalized = path.gsub("\\", "/")
         if File.directory?(normalized)
-          Dir.glob(File.join(normalized, "**", "*.cr")).each { |file| files << file }
+          # NOTE: no File.join — it would reintroduce a backslash
+          # separator on Windows and break the glob again.
+          Dir.glob("#{normalized}/**/*.cr").each { |file| files << file }
         elsif File.file?(normalized) && normalized.ends_with?(".cr")
           files << normalized
         end
