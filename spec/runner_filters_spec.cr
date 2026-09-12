@@ -62,12 +62,14 @@ describe Catalyst::Runner do
     Dir.mkdir_p(dir)
     begin
       File.write(File.join(dir, "sample.cr"), FIXTURE_CODE)
+      # Escape backslashes: raw Windows temp paths break YAML double quotes.
+      yaml_dir = dir.gsub("\\", "\\\\")
       config = Catalyst::Config.from_yaml(<<-YAML)
         severity: warning
         format: terminal
         rules: {}
         ignore: []
-        paths: ["#{dir}"]
+        paths: ["#{yaml_dir}"]
         YAML
       ids = Catalyst::Runner.new(config, Catalyst::Options.new).run([] of String).map(&.rule_id).to_set
       ids.should contain("CAT-001")
