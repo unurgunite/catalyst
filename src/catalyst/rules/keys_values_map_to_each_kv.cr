@@ -44,7 +44,7 @@ module Catalyst
 
         target = node.obj
         return nil unless target.is_a?(Crystal::Call)
-        return nil unless %w(keys values).includes?(target.name)
+        return nil unless %w[keys values].includes?(target.name)
         return nil unless target.args.empty?
         return nil unless target.block.nil?
 

@@ -56,8 +56,6 @@ module Catalyst
           check_call_plus(node, context)
         when Crystal::OpAssign
           check_op_assign_plus(node, context)
-        else
-          nil
         end
       end
 

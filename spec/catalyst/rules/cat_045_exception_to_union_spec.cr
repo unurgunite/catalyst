@@ -7,33 +7,37 @@ module Catalyst
 
       describe "#check" do
         it "detects raise with exception class" do
-          assert_finding(rule, <<-CRYSTAL)
+          assert_finding(rule, <<-CRYSTAL
             def process(id : Int32) : String
               raise ArgumentError.new("invalid id")
             end
-          CRYSTAL
+            CRYSTAL
+          )
         end
 
         it "detects raise with string" do
-          assert_finding(rule, <<-CRYSTAL)
+          assert_finding(rule, <<-CRYSTAL
             def lookup(key : String) : String?
               raise "not found"
             end
-          CRYSTAL
+            CRYSTAL
+          )
         end
 
         it "does not flag raise without args" do
-          assert_no_finding(rule, <<-CRYSTAL)
+          assert_no_finding(rule, <<-CRYSTAL
             def cleanup
               raise
             end
-          CRYSTAL
+            CRYSTAL
+          )
         end
 
         it "does not flag raise in top-level code" do
-          assert_no_finding(rule, <<-CRYSTAL)
+          assert_no_finding(rule, <<-CRYSTAL
             raise "fatal error"
-          CRYSTAL
+            CRYSTAL
+          )
         end
       end
 

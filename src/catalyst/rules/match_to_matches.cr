@@ -48,8 +48,6 @@ module Catalyst
           node
         elsif node.name == "=~"
           node
-        else
-          nil
         end
       end
 
