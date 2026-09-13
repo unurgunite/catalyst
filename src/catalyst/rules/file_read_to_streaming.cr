@@ -30,15 +30,33 @@ module Catalyst
         true
       end
 
+      # # Block methods that imply repeated execution of their body.
+      LOOP_BLOCK_METHODS = {
+        "each", "each_with_index", "each_with_object",
+        "times", "upto", "downto", "step", "loop",
+      }
+
       def initialize
         @config_parse_reads = Set(UInt64).new
+        @loop_depth = 0
       end
 
       def setup(file_path : String, source : String) : Nil
         @config_parse_reads.clear
+        @loop_depth = 0
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
+        results = check_read(node, context)
+        track_enter(node)
+        results
+      end
+
+      def end_visit(node : Crystal::ASTNode) : Nil
+        track_leave(node)
+      end
+
+      private def check_read(node : Crystal::ASTNode, context : Context) : Array(Result)
         # Parent (from_yaml/from_json) is visited before the nested
         # File.read, so remember reads that feed config parsing.
         if parse_call = config_parse_call(node)
@@ -58,16 +76,50 @@ module Catalyst
         line = call.location.try(&.line_number) || 0
         col = call.name_location.try(&.column_number) || 0
 
+        # A static check cannot know the file size: a one-off read of a
+        # small file is idiomatic, a repeated whole-file read in a loop is
+        # not. Loop reads stay warning/medium; one-off reads are low
+        # confidence info with an if-large caveat.
+        if @loop_depth > 0
+          sev = severity
+          message = "Use streaming (`File.open`) instead of `File.#{call.name}` for large files"
+          confidence = "medium"
+        else
+          sev = "info"
+          message = "Use streaming (`File.open`) instead of `File.#{call.name}` for large files if the file can be large"
+          confidence = "low"
+        end
+
         [Result.new(
           rule_id: id,
-          severity: severity,
-          message: "Use streaming (`File.open`) instead of `File.#{call.name}` for large files",
+          severity: sev,
+          message: message,
           file: context.file,
           line: line,
           column: col,
           suggestion: "Replace `File.#{call.name}` with `File.open` for streaming",
-          confidence: "medium",
+          confidence: confidence,
         )]
+      end
+
+      private def track_enter(node : Crystal::ASTNode) : Nil
+        @loop_depth += 1 if loop_opener?(node)
+      end
+
+      private def track_leave(node : Crystal::ASTNode) : Nil
+        @loop_depth -= 1 if loop_opener?(node)
+      end
+
+      private def loop_opener?(node : Crystal::ASTNode) : Bool
+        case node
+        when Crystal::While, Crystal::Until
+          true
+        when Crystal::Block
+          call = node.call
+          call.is_a?(Crystal::Call) && LOOP_BLOCK_METHODS.includes?(call.name)
+        else
+          false
+        end
       end
 
       private def file_read_call(node : Crystal::ASTNode) : Crystal::Call?
