@@ -23,3 +23,4 @@ Minimal Crystal code that triggers the rule:
 - [ ] Lint clean (`crystal run bin/ameba.cr --`)
 - [ ] Binary builds (`crystal build src/catalyst.cr --release -o bin/catalyst`)
 - [ ] Branch name follows convention (`feature/*`)
+- [ ] Version bumped (`shard.yml` + `src/catalyst/version.cr`) if this is a release

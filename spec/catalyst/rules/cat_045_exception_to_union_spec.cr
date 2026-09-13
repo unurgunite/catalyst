@@ -39,6 +39,37 @@ module Catalyst
             CRYSTAL
           )
         end
+
+        it "does not flag raise in bang method (validate! raises by contract)" do
+          assert_no_finding(rule, <<-CRYSTAL
+            def validate!
+              raise ArgumentError.new("invalid config")
+            end
+            CRYSTAL
+          )
+        end
+
+        it "still flags raise in predicate method" do
+          assert_finding(rule, <<-CRYSTAL
+            def valid?
+              raise "unreachable"
+              true
+            end
+            CRYSTAL
+          )
+        end
+
+        it "resets bang state between defs" do
+          assert_finding(rule, <<-CRYSTAL
+            def validate!
+              raise "bad"
+            end
+            def process(id : Int32) : String
+              raise ArgumentError.new("invalid id")
+            end
+            CRYSTAL
+          )
+        end
       end
 
       describe "#id" do

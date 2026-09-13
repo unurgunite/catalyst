@@ -6,7 +6,7 @@ module Catalyst
       end
 
       def severity : String
-        "warning"
+        "info"
       end
 
       def description : String
@@ -28,7 +28,7 @@ module Catalyst
           line: line,
           column: col,
           suggestion: "Use block form: `File.open(path) { |f| ... }`",
-          confidence: "high"
+          confidence: "low"
         )]
       end
 
