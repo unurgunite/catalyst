@@ -1,12 +1,6 @@
 require "yaml"
 
 module Catalyst
-  # # Raised when `.catalyst.yml` cannot be parsed into a `Config`.
-  # # Carries a human-readable message (file + what was expected);
-  # # the CLI prints it as a one-liner instead of a raw stacktrace.
-  class ConfigError < Exception
-  end
-
   # # Per-rule overrides for severity and enabled state.
   struct RuleConfig
     include YAML::Serializable
@@ -43,17 +37,9 @@ module Catalyst
     end
 
     # # Load config from YAML file path. Fallback to default if missing.
-    # # Raises `ConfigError` with a human-readable message on malformed YAML.
     def self.load(path : String = ".catalyst.yml") : Config
       if File.exists?(path)
-        begin
-          from_yaml(File.read(path))
-        rescue ex : YAML::ParseException
-          raise ConfigError.new(
-            "config error in #{path}: #{ex.message} — " \
-            "expected mappings like `rules: {CAT-001: {enabled: false}}`"
-          )
-        end
+        from_yaml(File.read(path))
       else
         default
       end
