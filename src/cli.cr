@@ -38,7 +38,12 @@ module Catalyst
         return 2
       end
 
-      config = ConfigLoader.load(config_path)
+      begin
+        config = ConfigLoader.load(config_path)
+      rescue ex : ConfigError
+        STDERR.puts "catalyst: #{ex.message}"
+        return 2
+      end
       runner = Runner.new(config, options)
       results = runner.run(args)
 
