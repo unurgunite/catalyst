@@ -29,6 +29,23 @@ module Catalyst
         it "ignores non-parse calls" do
           assert_no_finding(rule, "URI.new(\"https://example.com\")")
         end
+
+        it "ignores variable argument outside loops" do
+          assert_no_finding(rule, "uri = URI.parse(url)")
+        end
+
+        it "flags variable argument inside loops as low confidence" do
+          results = run_rule(rule, "urls.each { |url| URI.parse(url) }")
+          results.size.should eq(1)
+          results.first.confidence.should eq("low")
+          results.first.message.should contain("if the same value")
+        end
+
+        it "flags literal argument with high confidence" do
+          results = run_rule(rule, "URI.parse(\"https://example.com\")")
+          results.size.should eq(1)
+          results.first.confidence.should eq("high")
+        end
       end
 
       describe "#id" do
