@@ -2,9 +2,6 @@ module Catalyst
   module Rules
     class ExceptionToUnion < Rule
       @inside_def : Bool = false
-      # # Bang methods (`validate!`, `fetch!`) raise by naming contract —
-      # # flagging them contradicts Crystal idiom, so they stay silent.
-      @bang_def : Bool = false
 
       def id : String
         "CAT-045"
@@ -21,10 +18,9 @@ module Catalyst
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         if node.is_a?(Crystal::Def)
           @inside_def = true
-          @bang_def = node.name.ends_with?("!")
         end
 
-        if @inside_def && !@bang_def && node.is_a?(Crystal::Call) && node.name == "raise" && node.args.size >= 1
+        if @inside_def && node.is_a?(Crystal::Call) && node.name == "raise" && node.args.size >= 1
           line = node.location.try(&.line_number) || 0
           column = node.location.try(&.column_number) || 0
           [Result.new(
@@ -45,7 +41,6 @@ module Catalyst
       def end_visit(node : Crystal::ASTNode) : Nil
         if node.is_a?(Crystal::Def)
           @inside_def = false
-          @bang_def = false
         end
       end
 

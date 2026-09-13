@@ -63,8 +63,8 @@ module Catalyst
       end
 
       describe "#severity" do
-        it "returns info (leak cannot be proven locally)" do
-          rule.severity.should eq("info")
+        it "returns warning" do
+          rule.severity.should eq("warning")
         end
       end
 

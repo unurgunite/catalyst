@@ -11,7 +11,6 @@ end
 def run_rule(rule : Catalyst::Rule, code : String) : Array(Catalyst::Result)
   ast = parse_code(code)
   context = Catalyst::Context.new("test.cr", code)
-  rule.setup("test.cr", code)
   visitor = Catalyst::Visitors::FileVisitor.new([rule] of Catalyst::Rule, context)
   ast.accept(visitor)
   visitor.results
