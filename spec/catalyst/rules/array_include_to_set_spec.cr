@@ -22,6 +22,14 @@ module Catalyst
           assert_no_finding(rule, "s = Set{1, 2, 3}\ns.includes?(x)")
         end
 
+        it "ignores Set variable inside loops (already O(1))" do
+          assert_no_finding(rule, "seen = Set{1, 2, 3}\nitems.each { |i| seen.includes?(i) }")
+        end
+
+        it "ignores Set literal receiver inside loops" do
+          assert_no_finding(rule, "items.each { |i| Set{1, 2, 3, 4, 5, 6, 7, 8, 9}.includes?(i) }")
+        end
+
         it "ignores variable reassigned from array to Set" do
           assert_no_finding(rule, "a = [1, 2]\na = Set{3}\na.includes?(3)")
         end

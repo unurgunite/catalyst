@@ -91,13 +91,23 @@ module Catalyst
       end
 
       # # Array size if receiver is proven to be an array, else nil.
+      # # Named literals (`Set{...}` parses as `ArrayLiteral` with a name)
+      # # are not arrays.
       private def array_receiver_size(node : Crystal::ASTNode) : Int32?
         if node.is_a?(Crystal::ArrayLiteral)
-          node.elements.size
+          plain_array_size(node)
         elsif node.is_a?(Crystal::Var) ||
               node.is_a?(Crystal::InstanceVar) ||
               node.is_a?(Crystal::ClassVar)
           @array_sizes[node.name]?
+        end
+      end
+
+      # # Size of an unnamed array literal (`Array{...}` counts), else nil.
+      private def plain_array_size(literal : Crystal::ArrayLiteral) : Int32?
+        name = literal.name
+        if name.nil? || (name.is_a?(Crystal::Path) && name.names == ["Array"])
+          literal.elements.size
         end
       end
 
@@ -130,8 +140,8 @@ module Catalyst
                end
 
         literal = unwrap(value)
-        if literal.is_a?(Crystal::ArrayLiteral)
-          @array_sizes[name] = literal.elements.size
+        if literal.is_a?(Crystal::ArrayLiteral) && (size = plain_array_size(literal))
+          @array_sizes[name] = size
         else
           @array_sizes.delete(name)
         end
