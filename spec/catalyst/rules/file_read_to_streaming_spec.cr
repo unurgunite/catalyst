@@ -56,6 +56,28 @@ module Catalyst
           assert_no_finding(rule, %(AppConfig.from_yaml(File.read(CONFIG_PATH))))
           assert_no_finding(rule, %(cfg = Config.from_json(File.read(path))))
         end
+
+        it "flags one-off reads as info/low with if-large caveat" do
+          results = run_rule(rule, %(File.read("data.bin")))
+          results.size.should eq(1)
+          results.first.severity.should eq("info")
+          results.first.confidence.should eq("low")
+          results.first.message.should contain("if the file can be large")
+        end
+
+        it "flags reads inside loops as warning/medium" do
+          results = run_rule(rule, %(paths.each { |p| File.read(p) }))
+          results.size.should eq(1)
+          results.first.severity.should eq("warning")
+          results.first.confidence.should eq("medium")
+        end
+
+        it "flags reads inside while loops as warning/medium" do
+          results = run_rule(rule, %(while running\n  File.read(path)\nend))
+          results.size.should eq(1)
+          results.first.severity.should eq("warning")
+          results.first.confidence.should eq("medium")
+        end
       end
 
       describe "#id" do
