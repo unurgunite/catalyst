@@ -1,9 +1,15 @@
 module Catalyst
   module Rules
-    # # Detects `includes?` calls on arrays and suggests using a `Set`.
+    # # Detects `includes?` calls on known arrays and suggests using a `Set`.
     ##
     # # `Array#includes?` is O(n) per call. When checking membership repeatedly
     # # (e.g. inside a loop), converting to a `Set` first makes each lookup O(1).
+    # #
+    # # Strict policy: only receivers proven to be arrays are flagged — array
+    # # literals and variables assigned from array literals in the same file.
+    # # Anything else (method params, call results, unknown variables) stays
+    # # silent: without type information a `Set` suggestion may be actively
+    # # wrong (e.g. the receiver is already a `Set`).
     # #
     # # Stays silent for `Range#includes?` (O(1) already — a `Set` would only
     # # add allocations) and for small array literals outside loops, where the
@@ -19,6 +25,8 @@ module Catalyst
       }
 
       @loop_depth : Int32 = 0
+      # # Local variable names assigned from array literals (name -> size).
+      @array_sizes = {} of String => Int32
 
       def id : String
         "CAT-004"
@@ -34,10 +42,12 @@ module Catalyst
 
       def setup(file_path : String, source : String) : Nil
         @loop_depth = 0
+        @array_sizes.clear
       end
 
       # # Check if node is an `includes?` call with exactly one argument.
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
+        track_assign(node)
         results = check_includes(node, context)
         track_enter(node)
         results
@@ -55,29 +65,15 @@ module Catalyst
 
         unwrapped = unwrap(receiver)
 
-        # Only array-literal and unknown (variable/call) receivers can
-        # plausibly be arrays. Every other literal has either O(1) lookup
-        # (Range), no meaningful `includes?` at all (numbers), or a
-        # different semantic (String substring search) where `Set` makes
-        # no sense.
-        case unwrapped
-        when Crystal::ArrayLiteral
-          if unwrapped.elements.size < SMALL_LITERAL_LIMIT && @loop_depth == 0
-            return [] of Result
-          end
-        when Crystal::RangeLiteral,
-             Crystal::NumberLiteral,
-             Crystal::StringLiteral,
-             Crystal::SymbolLiteral,
-             Crystal::CharLiteral,
-             Crystal::RegexLiteral,
-             Crystal::HashLiteral,
-             Crystal::TupleLiteral,
-             Crystal::NamedTupleLiteral,
-             Crystal::NilLiteral,
-             Crystal::BoolLiteral
-          return [] of Result
-        end
+        # Only receivers proven to be arrays are flagged: array literals
+        # and variables assigned from array literals in this file.
+        # Unknown receivers (params, call results, plain variables) stay
+        # silent — suggesting `Set` for something already O(1) (e.g. a
+        # `Set`) is worse than noise. Every non-array literal (Range with
+        # O(1) lookup, numbers, String substring search, ...) is out too.
+        size = array_receiver_size(unwrapped)
+        return [] of Result if size.nil?
+        return [] of Result if size < SMALL_LITERAL_LIMIT && @loop_depth == 0
 
         line = node.location.try(&.line_number) || 0
         col = node.name_location.try(&.column_number) || 0
@@ -94,12 +90,60 @@ module Catalyst
         )]
       end
 
+      # # Array size if receiver is proven to be an array, else nil.
+      # # Named literals (`Set{...}` parses as `ArrayLiteral` with a name)
+      # # are not arrays.
+      private def array_receiver_size(node : Crystal::ASTNode) : Int32?
+        if node.is_a?(Crystal::ArrayLiteral)
+          plain_array_size(node)
+        elsif node.is_a?(Crystal::Var) ||
+              node.is_a?(Crystal::InstanceVar) ||
+              node.is_a?(Crystal::ClassVar)
+          @array_sizes[node.name]?
+        end
+      end
+
+      # # Size of an unnamed array literal (`Array{...}` counts), else nil.
+      private def plain_array_size(literal : Crystal::ArrayLiteral) : Int32?
+        name = literal.name
+        if name.nil? || (name.is_a?(Crystal::Path) && name.names == ["Array"])
+          literal.elements.size
+        end
+      end
+
       # # Strip grouping parentheses: `(1..5)` parses as Expressions.
       private def unwrap(node : Crystal::ASTNode) : Crystal::ASTNode
         if node.is_a?(Crystal::Expressions) && node.expressions.size == 1
           node.expressions.first
         else
           node
+        end
+      end
+
+      # # Remember variables assigned from array literals; forget variables
+      # # assigned anything else (e.g. reassigned to a `Set`).
+      private def track_assign(node : Crystal::ASTNode) : Nil
+        case node
+        when Crystal::Assign
+          target, value = node.target, node.value
+        when Crystal::OpAssign
+          target, value = node.target, node.value
+        else
+          return
+        end
+
+        name = case target
+               when Crystal::Var, Crystal::InstanceVar, Crystal::ClassVar
+                 target.name
+               else
+                 return
+               end
+
+        literal = unwrap(value)
+        if literal.is_a?(Crystal::ArrayLiteral) && (size = plain_array_size(literal))
+          @array_sizes[name] = size
+        else
+          @array_sizes.delete(name)
         end
       end
 
