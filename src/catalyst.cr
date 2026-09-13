@@ -25,12 +25,15 @@ end
   # (built `catalyst` binary, including `catalyst.exe`, or
   # `crystal run src/catalyst.cr`). When required from other programs
   # (generate_docs, custom tooling) preserve the old call-and-ignore
-  # behavior so their own entrypoints keep working.
+  # behavior on success so their own entrypoints keep working — but never
+  # swallow a failure exit code (renamed copies and wrappers must still
+  # fail CI on config errors and `--ci` findings).
   entry = File.basename(PROGRAM_NAME, File.extname(PROGRAM_NAME))
   if entry.ends_with?("catalyst") || entry.starts_with?("crystal-run-catalyst")
     exit(Catalyst::CLI.run(ARGV))
   else
-    Catalyst::CLI.run(ARGV)
+    code = Catalyst::CLI.run(ARGV)
+    exit(code) unless code == 0
   end
 {% else %}
   # Required from specs: run without exiting so `crystal spec` keeps working.
