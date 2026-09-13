@@ -5,7 +5,7 @@ module Catalyst
   class CLI
     # # Parse arguments and execute the analysis pipeline.
     ##
-    # # Returns exit code (0 = success, 1 = findings in CI mode).
+    # # Returns exit code (0 = success, 1 = findings in CI mode, 2 = error).
     def self.run(args : Array(String) = ARGV) : Int32
       options = Options.new
       config_path = ".catalyst.yml"
