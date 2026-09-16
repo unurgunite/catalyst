@@ -1,7 +1,7 @@
 module Catalyst
   module Rules
     class LoggingBlock < Rule
-      LOG_LEVELS = {"debug", "info", "warn", "error", "fatal", "enbug"}
+      LOG_LEVELS = {"debug", "info", "warn", "error", "fatal"}
 
       def id : String
         "CAT-037"

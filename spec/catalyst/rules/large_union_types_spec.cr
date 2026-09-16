@@ -6,16 +6,21 @@ module Catalyst
       rule = LargeUnionTypes.new
 
       describe "#check" do
-        it "detects 4 types in union return type" do
-          assert_finding(rule, "def foo : Int32 | String | Nil | Bool; 1; end")
+        it "detects 4 non-Nil types in union return type" do
+          assert_finding(rule, "def foo : Int32 | String | Bool | Float64; 1; end")
         end
 
         it "detects 5 types in union return type" do
           assert_finding(rule, "def foo : Int32 | String | Nil | Bool | Float64; 1; end")
         end
 
+        it "ignores ordinary nilable unions (Nil does not count)" do
+          assert_no_finding(rule, "def foo : Int32 | String | Bool | Nil; 1; end")
+          assert_no_finding(rule, "def foo : Int32 | String | Nil | Bool; 1; end")
+        end
+
         it "detects nested union with parens" do
-          assert_finding(rule, "def foo : (Int32 | String) | Nil | Bool; 1; end")
+          assert_finding(rule, "def foo : (Int32 | String | Bool) | Float64 | Nil; 1; end")
         end
 
         it "ignores 3 types union" do

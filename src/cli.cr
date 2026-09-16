@@ -62,7 +62,8 @@ module Catalyst
       else
         puts "Available rules:"
         Rule.all.each do |rule|
-          puts "  #{rule.id.ljust(8)} #{rule.severity.ljust(7)} #{rule.description}"
+          tag = rule.enabled_by_default? ? "" : " [opt-in]"
+          puts "  #{rule.id.ljust(8)} #{rule.severity.ljust(7)} #{rule.description}#{tag}"
         end
       end
     end
