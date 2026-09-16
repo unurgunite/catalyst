@@ -99,7 +99,9 @@ module Catalyst
         end
 
         backup = "#{file}.bak"
-        File.copy(file, backup)
+        unless File.exists?(backup)
+          File.copy(file, backup)
+        end
 
         File.write(file, lines.join("\n"))
         STDOUT.puts "catalyst: fixed #{file} (backup: #{backup})"

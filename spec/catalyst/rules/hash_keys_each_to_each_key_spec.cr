@@ -29,6 +29,41 @@ module Catalyst
         it "ignores .each on array" do
           assert_no_finding(rule, "ary.each")
         end
+
+        it "flags mutating blocks as low without a fix (delete)" do
+          results = run_rule(rule, "h.keys.each { |k| h.delete(k) }")
+          results.size.should eq(1)
+          results.first.confidence.should eq("low")
+          results.first.message.should contain("mutates")
+          results.first.fix_replacement.should be_nil
+        end
+
+        it "flags mutating blocks as low without a fix ([]=)" do
+          results = run_rule(rule, "h.keys.each { |k| h[k] = 1 }")
+          results.size.should eq(1)
+          results.first.confidence.should eq("low")
+          results.first.fix_replacement.should be_nil
+        end
+
+        it "flags mutating ivar blocks as low without a fix" do
+          results = run_rule(rule, "@h.keys.each { |k| @h.clear }")
+          results.size.should eq(1)
+          results.first.confidence.should eq("low")
+          results.first.fix_replacement.should be_nil
+        end
+
+        it "keeps the fix when another hash is mutated" do
+          results = run_rule(rule, "h.keys.each { |k| g.delete(k) }")
+          results.size.should eq(1)
+          results.first.confidence.should eq("high")
+          results.first.fix_replacement.should_not be_nil
+        end
+
+        it "keeps the fix for read-only blocks" do
+          results = run_rule(rule, "hash.keys.each { |k| k }")
+          results.size.should eq(1)
+          results.first.fix_replacement.should_not be_nil
+        end
       end
 
       describe "#id" do

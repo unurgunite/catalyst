@@ -25,6 +25,12 @@ module Catalyst
         it "ignores Fiber.yield" do
           assert_no_finding(rule, "Fiber.yield")
         end
+
+        it "flags as medium confidence (event loop vs direct yield)" do
+          results = run_rule(rule, "sleep(0)")
+          results.size.should eq(1)
+          results.first.confidence.should eq("medium")
+        end
       end
 
       describe "#id" do

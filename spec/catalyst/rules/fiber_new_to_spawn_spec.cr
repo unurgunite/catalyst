@@ -38,6 +38,7 @@ module Catalyst
       describe "#description" do
         it "returns description text" do
           rule.description.should contain("spawn")
+          rule.description.should contain("resume")
         end
       end
     end

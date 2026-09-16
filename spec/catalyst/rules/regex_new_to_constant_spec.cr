@@ -18,6 +18,18 @@ module Catalyst
           assert_finding(rule, "[1, 2, 3].each { Regex.new(\"pattern\") }")
         end
 
+        it "emits a fix for literal patterns" do
+          results = run_rule(rule, %q(rx = Regex.new("user-id")))
+          results.size.should eq(1)
+          results.first.fix_replacement.should eq(%q(rx = USER_ID))
+        end
+
+        it "emits no fix for dynamic patterns" do
+          results = run_rule(rule, "rx = Regex.new(pattern)")
+          results.size.should eq(1)
+          results.first.fix_replacement.should be_nil
+        end
+
         it "ignores Regex.new assigned to constant" do
           assert_no_finding(rule, "RE = Regex.new(\"pattern\")")
         end
