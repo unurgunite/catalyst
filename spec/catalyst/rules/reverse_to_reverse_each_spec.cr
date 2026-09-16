@@ -2,8 +2,8 @@ require "../../spec_helper"
 
 module Catalyst
   module Rules
-    describe ReverseEachToReverseEach do
-      rule = ReverseEachToReverseEach.new
+    describe ReverseToReverseEach do
+      rule = ReverseToReverseEach.new
 
       describe "#check" do
         it "detects reverse.each with block" do
