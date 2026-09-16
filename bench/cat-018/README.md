@@ -1,12 +1,16 @@
-# CAT-018: Use `matches?` instead of `match` or `=~` for boolean context
+# CAT-018: Use `matches?` instead of `match` for boolean context
 
 `String#match` returns a `MatchData | Nil` object which is wasteful when only a boolean check is needed. `String#matches?` returns `Bool` directly without allocating a `MatchData` object.
+
+NOTE: `=~` is out of scope for this rule — it returns `Int32 | Nil`
+(match position), not `Bool`, so replacing it with `matches?` would
+change the program's type.
 
 ## Before / After
 
 ```crystal
-str.match(/pattern/)   # → str.matches?(/pattern/)
-str =~ /pattern/       # → str.matches?(/pattern/)
+if str.match(/pattern/)   # → if str.matches?(/pattern/)
+end
 ```
 
 ## Results (macOS ARM, Crystal 1.20.3)

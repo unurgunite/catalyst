@@ -6,11 +6,11 @@ module Catalyst
       end
 
       def severity : String
-        "warning"
+        "info"
       end
 
       def description : String
-        "Use `spawn` instead of `Thread.new`"
+        "Use `spawn` instead of `Thread.new` (only if a fiber, not a thread, is really needed)"
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
@@ -27,12 +27,12 @@ module Catalyst
         [Result.new(
           rule_id: id,
           severity: severity,
-          message: "Use `spawn` instead of `Thread.new`",
+          message: "Use `spawn` instead of `Thread.new` (only if a fiber, not a thread, is really needed)",
           file: context.file,
           line: line,
           column: col,
-          suggestion: "Replace `Thread.new { ... }` with `spawn { ... }`",
-          confidence: "high",
+          suggestion: "Replace `Thread.new { ... }` with `spawn { ... }` only when OS-thread semantics (parallelism, blocking calls, thread-local state) are not required",
+          confidence: "low",
         )]
       end
 

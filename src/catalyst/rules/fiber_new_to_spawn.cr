@@ -10,7 +10,7 @@ module Catalyst
       end
 
       def description : String
-        "Use `spawn` instead of `Fiber.new { ... }.resume`"
+        "Use `spawn` instead of `Fiber.new { ... }.resume` (`resume` runs now, `spawn` enqueues — equivalent for a fresh fiber)"
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)

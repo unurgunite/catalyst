@@ -1,5 +1,11 @@
 module Catalyst
   module Rules
+    # # Suggests Struct for small data-only classes.
+    ##
+    # # Deliberately a soft hint (info/medium), never to be promoted:
+    # # value semantics (mutation through copies), `same?`/identity checks
+    # # elsewhere, and future inheritance needs are invisible to a local
+    # # check — one wrong promotion burns trust in the whole rule.
     class StructVsClass < Rule
       ACCESSOR_METHODS = {"property", "getter", "setter"}
 

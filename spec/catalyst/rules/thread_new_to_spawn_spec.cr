@@ -21,6 +21,14 @@ module Catalyst
         it "ignores Thread.list" do
           assert_no_finding(rule, "Thread.list")
         end
+
+        it "flags as info/low (thread-to-fiber changes execution model)" do
+          results = run_rule(rule, "Thread.new { do_work }")
+          results.size.should eq(1)
+          results.first.severity.should eq("info")
+          results.first.confidence.should eq("low")
+          results.first.message.should contain("not a thread")
+        end
       end
 
       describe "#id" do
@@ -30,8 +38,8 @@ module Catalyst
       end
 
       describe "#severity" do
-        it "returns warning" do
-          rule.severity.should eq("warning")
+        it "returns info" do
+          rule.severity.should eq("info")
         end
       end
 

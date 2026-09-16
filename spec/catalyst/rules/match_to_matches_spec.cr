@@ -6,16 +6,44 @@ module Catalyst
       rule = MatchToMatches.new
 
       describe "#check" do
-        it "detects str.match(/pattern/)" do
-          assert_finding(rule, %q("hello".match(/world/)))
+        it "detects match in if condition" do
+          assert_finding(rule, %q(if s.match(/re/); end))
         end
 
-        it "detects str =~ /pattern/" do
-          assert_finding(rule, %q("hello" =~ /world/))
+        it "detects match in unless condition" do
+          assert_finding(rule, %q(unless s.match(/re/); end))
         end
 
-        it "detects .match with variable receiver" do
-          assert_finding(rule, "str.match(/pattern/)")
+        it "detects match in while condition" do
+          assert_finding(rule, %q(while s.match(/re/); end))
+        end
+
+        it "detects match under negation and boolean operators" do
+          assert_finding(rule, %q(!s.match(/re/)))
+          assert_finding(rule, %q(a && s.match(/re/)))
+          assert_finding(rule, %q(a || s.match(/re/)))
+        end
+
+        it "detects match in ternary condition" do
+          assert_finding(rule, %q(x = s.match(/re/) ? 1 : 2))
+        end
+
+        it "ignores bare match (MatchData may be needed)" do
+          assert_no_finding(rule, %q("hello".match(/world/)))
+          assert_no_finding(rule, "str.match(/pattern/)")
+        end
+
+        it "ignores assigned match (MatchData is used)" do
+          assert_no_finding(rule, %q(m = s.match(/re/)))
+        end
+
+        it "ignores match as method argument" do
+          assert_no_finding(rule, %q(foo(s.match(/re/))))
+        end
+
+        it "ignores str =~ /pattern/ (`=~` returns Int32 | Nil, not Bool)" do
+          assert_no_finding(rule, %q("hello" =~ /world/))
+          assert_no_finding(rule, %q(if s =~ /re/; end))
         end
 
         it "ignores str.matches? (already optimal)" do
