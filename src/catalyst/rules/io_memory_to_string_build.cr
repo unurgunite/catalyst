@@ -18,7 +18,7 @@ module Catalyst
       end
 
       def auto_fixable? : Bool
-        true
+        false
       end
 
       # Check if node is a call to `to_s` or `to_string` on an `IO::Memory.new` chain.

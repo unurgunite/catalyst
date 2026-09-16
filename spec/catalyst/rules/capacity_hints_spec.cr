@@ -43,9 +43,16 @@ module Catalyst
         end
       end
 
+      describe "#enabled_by_default?" do
+        it "is opt-in (noisy on plain empty collections)" do
+          rule.enabled_by_default?.should be_false
+        end
+      end
+
       describe "#description" do
         it "returns description text" do
           rule.description.should contain("capacity")
+          rule.description.should contain("opt-in")
         end
       end
     end

@@ -4,7 +4,7 @@ module Catalyst
     ##
     # # `Array#reverse` creates a new reversed array.
     # # `Array#reverse_each` iterates backwards without allocation.
-    class ReverseEachToReverseEach < Rule
+    class ReverseToReverseEach < Rule
       def id : String
         "CAT-007"
       end

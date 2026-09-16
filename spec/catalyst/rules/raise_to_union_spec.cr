@@ -49,6 +49,15 @@ module Catalyst
           )
         end
 
+        it "does not flag raise in initialize (breaks constructor contract)" do
+          assert_no_finding(rule, <<-CRYSTAL
+            def initialize(name : String)
+              raise ArgumentError.new("blank") if name.empty?
+            end
+            CRYSTAL
+          )
+        end
+
         it "still flags raise in predicate method" do
           assert_finding(rule, <<-CRYSTAL
             def valid?

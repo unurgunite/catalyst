@@ -25,6 +25,13 @@ module Catalyst
         it "detects Time.local in variable assignment" do
           assert_finding(rule, "local_time = Time.local(2024, 1, 1)")
         end
+
+        it "is finding-only (autofix would change timezone semantics)" do
+          rule.auto_fixable?.should be_false
+          results = run_rule(rule, "Time.local(2024, 1, 1)")
+          results.size.should eq(1)
+          results.first.fix_replacement.should be_nil
+        end
       end
 
       describe "#id" do

@@ -18,8 +18,11 @@ module Catalyst
         "Use `Time.utc` instead of `Time.local` when local timezone is not required"
       end
 
+      # NOTE: deliberately NOT auto-fixable. The replacement changes program
+      # semantics (timezone), and a line-based `gsub` would also rewrite
+      # comments and string literals on the same line. Finding only.
       def auto_fixable? : Bool
-        true
+        false
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
@@ -30,8 +33,6 @@ module Catalyst
 
         line = node.location.try(&.line_number) || 0
         col = node.name_location.try(&.column_number) || 0
-        line_text = context.line_text(line)
-        fix = line_text.gsub("Time.local", "Time.utc")
 
         [Result.new(
           rule_id: id,
@@ -42,7 +43,6 @@ module Catalyst
           column: col,
           suggestion: "Replace `Time.local(...)` with `Time.utc(...)`",
           confidence: "medium",
-          fix_replacement: fix,
         )]
       end
 

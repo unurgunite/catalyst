@@ -12,7 +12,15 @@ module Catalyst
       end
 
       def description : String
-        "Pre-size collections with capacity hints when size is known"
+        "Pre-size collections with capacity hints when size is known (opt-in: noisy on plain empty collections)"
+      end
+
+      # NOTE: deliberately opt-in. The rule cannot know whether the size
+      # is actually known at the creation site, so on by default it flags
+      # every plain `Array(T).new` — noise that buries real warnings.
+      # Re-enable per project once loop-with-`<<` detection exists.
+      def enabled_by_default? : Bool
+        false
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
