@@ -51,6 +51,8 @@ module Catalyst
       end
 
       # # If node is `select{}.first` / `{}.first?`, return the outer call node.
+      # # Requires a single-param block: `select { |x, i| ... }.first`
+      # # cannot become `find` (it yields element only — the index is lost).
       private def select_first_call(node : Crystal::ASTNode) : Crystal::Call?
         return nil unless node.is_a?(Crystal::Call)
         return nil unless node.name == "first" || node.name == "first?"
@@ -59,7 +61,9 @@ module Catalyst
         target = node.obj
         return nil unless target.is_a?(Crystal::Call)
         return nil unless target.name.in?(SELECT_METHODS)
-        return nil unless target.block
+        return nil unless block = target.block
+        # 0 (`it`), 1 (`|x|`, `&.`, `|*a|`) are safe; 2+ would drop params.
+        return nil unless block.args.size <= 1
 
         node
       end

@@ -10,7 +10,7 @@ module Catalyst
       end
 
       def description : String
-        "Use `Fiber.yield` instead of `sleep(0)`"
+        "Use `Fiber.yield` instead of `sleep(0)` (both yield the scheduler; `sleep(0)` goes through the event loop)"
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
@@ -33,7 +33,7 @@ module Catalyst
           line: line,
           column: col,
           suggestion: "Replace `sleep(0)` with `Fiber.yield`",
-          confidence: "high",
+          confidence: "medium",
         )]
       end
 

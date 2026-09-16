@@ -45,6 +45,14 @@ module Catalyst
         it "ignores select.first with argument" do
           assert_no_finding(rule, "[1, 2, 3].select { |x| x.even? }.first(2)")
         end
+
+        it "ignores select with index block (find yields element only)" do
+          assert_no_finding(rule, "[1, 2, 3].select { |x, i| x > i }.first")
+        end
+
+        it "detects select with implicit-it block" do
+          assert_finding(rule, "[1, 2, 3].select { it.even? }.first")
+        end
       end
 
       describe "#id" do
