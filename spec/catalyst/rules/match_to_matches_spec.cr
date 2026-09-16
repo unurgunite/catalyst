@@ -46,6 +46,18 @@ module Catalyst
           assert_no_finding(rule, %q(if s =~ /re/; end))
         end
 
+        it "emits a fix for a single match call on the line" do
+          results = run_rule(rule, %q(if s.match(/re/); end))
+          results.size.should eq(1)
+          results.first.fix_replacement.should eq(%q(if s.matches?(/re/); end))
+        end
+
+        it "emits no fix when the line holds two match calls" do
+          results = run_rule(rule, %q(if a.match(/x/) && b.match(/y/); end))
+          results.size.should eq(2)
+          results.all?(&.fix_replacement.nil?).should be_true
+        end
+
         it "ignores str.matches? (already optimal)" do
           assert_no_finding(rule, %q("hello".matches?(/world/)))
         end

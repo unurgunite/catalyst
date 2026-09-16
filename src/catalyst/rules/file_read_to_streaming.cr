@@ -27,7 +27,7 @@ module Catalyst
       end
 
       def auto_fixable? : Bool
-        true
+        false
       end
 
       # # Block methods that imply repeated execution of their body.

@@ -44,6 +44,7 @@ module Catalyst
           column: col,
           suggestion: "Use `matches?` instead of `match`",
           confidence: "high",
+          fix_replacement: match_fix(call, context.line_text(line)),
         )]
       end
 
@@ -56,6 +57,15 @@ module Catalyst
         # `Int32 | Nil` (match position), not `Bool`, so suggesting
         # `matches?` would change the program's type — e.g. `i = s =~ /re/`.
         node
+      end
+
+      # Swap `.match(` for `.matches?(` — the signatures align
+      # (`pattern, pos = 0`). Only when the line holds a single `.match(`
+      # call; multi-call lines get a finding without a fix.
+      private def match_fix(call : Crystal::Call, line_text : String) : String?
+        return nil unless line_text.scan(".match(").size == 1
+        fixed = line_text.sub(".match(", ".matches?(")
+        fixed == line_text ? nil : fixed
       end
 
       def end_visit(node : Crystal::ASTNode) : Nil
