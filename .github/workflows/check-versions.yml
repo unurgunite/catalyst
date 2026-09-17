@@ -1,0 +1,74 @@
+name: Check versions
+
+# Guards the release flow so a repeat of the v0.6.0 incident (release
+# branch merged to master without the version bump, Release workflow
+# failing on shard.yml != input) is caught at PR time, not at release.
+on: [push, pull_request]
+
+jobs:
+  check-versions:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. The two version sources must always agree with each other.
+      - name: shard.yml and version.cr agree
+        run: |
+          shard="$(grep '^version:' shard.yml | awk '{print $2}')"
+          code="$(grep -oE 'VERSION = "[^"]+"' src/catalyst/version.cr | cut -d'"' -f2)"
+          echo "shard.yml: $shard, version.cr: $code"
+          if [ "$shard" != "$code" ]; then
+            echo "version mismatch: shard.yml ($shard) != src/catalyst/version.cr ($code)"
+            exit 1
+          fi
+
+      # 2. A release branch heading to master must already carry its own
+      # version (i.e. the bump PR landed first). Would have blocked the
+      # v0.6.0 merge, whose files still said 0.5.0.
+      - name: release branch carries its version
+        if: github.event_name == 'pull_request' && github.base_ref == 'master'
+        run: |
+          head="${{ github.head_ref }}"
+          if [[ "$head" =~ ^v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            expected="${BASH_REMATCH[1]}"
+            shard="$(grep '^version:' shard.yml | awk '{print $2}')"
+            echo "release branch $head expects $expected, shard.yml has $shard"
+            if [ "$shard" != "$expected" ]; then
+              echo "release branch $head must carry version $expected before merge to master (shard.yml has $shard). Land the version bump PR first."
+              exit 1
+            fi
+          fi
+
+      # 3. Tagged commits ([x.y.z] prefix per repo convention) must match
+      # the version of the release line they target. Merge commits and
+      # untagged messages are skipped.
+      - name: commit tags match release version
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          base="${{ github.base_ref }}"
+          head="${{ github.head_ref }}"
+          expected=""
+          if [[ "$base" =~ ^v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            expected="${BASH_REMATCH[1]}"
+          elif [ "$base" = "master" ] && [[ "$head" =~ ^v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            expected="${BASH_REMATCH[1]}"
+          fi
+          if [ -z "$expected" ]; then
+            echo "no release version to check against (base=$base head=$head), skipping"
+            exit 0
+          fi
+          echo "expecting commit tags [$expected] (base=$base head=$head)"
+          failed=0
+          while IFS= read -r subject; do
+            if [[ "$subject" =~ ^\[([0-9]+\.[0-9]+\.[0-9]+)\] ]]; then
+              if [ "${BASH_REMATCH[1]}" != "$expected" ]; then
+                echo "commit tag mismatch: [$subject] does not match expected [$expected]"
+                failed=1
+              fi
+            fi
+          done < <(gh pr view "${{ github.event.pull_request.number }}" --json commits --jq '.commits[].messageHeadline')
+          exit $failed

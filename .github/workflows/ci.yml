@@ -60,5 +60,6 @@ jobs:
       - name: Verify binary
         run: |
           bin/catalyst --version
+          test "$(bin/catalyst --version)" = "catalyst v$(grep '^version:' shard.yml | awk '{print $2}')"
           bin/catalyst --help
           bin/catalyst --list-rules
