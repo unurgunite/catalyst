@@ -2,18 +2,18 @@ module Catalyst
   module Rules
     # # Blocking calls inside `spawn` workers.
     ##
-    # # A worker fiber that blocks on `Process.new` (xray), a raw socket,
+    # # A worker fiber that blocks on `Process.new` (subprocess), a raw socket,
     # # or a bare `sleep` holds an event-loop thread while doing nothing.
     # # At fan-out (dozens of fibers × semaphore permits) this starves
     # # `Fiber::ExecutionContext::ThreadPool` — the shape that segfaulted
-    # # in production at 50×100.
+    # # in production.
     # #
     # # Three detection levels, all `warning`/`medium` (never `error`: a
     # # timeout/limit around the call is invisible statically):
     # # 1. Blocking primitives lexically inside a `spawn` block.
-    # # 2. Worker-wrapper calls (`test_config`, `tcp_alive?`, ...) lexically
+    # # 2. Worker-wrapper calls (`check_config`, `tcp_alive?`, ...) lexically
     # #    inside `spawn` — the blocking body lives behind a `def` boundary
-    # #    (e.g. `test_config` spawns xray + `sleep 1.8`).
+    # #    (e.g. `check_config` spawns a subprocess + `sleep 1.8`).
     # # 3. Blocking primitives inside a `def` that is statically called
     # #    from `spawn` (depth ≤ 3, through `->(){}.call` lambdas): the body
     # #    scan runs when the wrapper call is seen, so forward references
@@ -26,17 +26,17 @@ module Catalyst
       HTTP_METHODS    = {"get", "post", "put", "delete", "patch", "head", "exec", "request"}
 
       # # Worker wrappers: blocking bodies behind a `def` boundary, called
-      # # from `spawn` (vpn-checker probe chain).
+      # # from `spawn` (probe chain: check → fetch → subprocess).
       WORKER_WRAPPERS = {
-        "test_config", "test_config_full", "test_opencode", "test_opencode_full",
+        "check_config", "check_config_full", "check_remote", "check_remote_full",
         "verify_model_for_url", "verify_model",
         "fetch_ip", "fetch_country", "tcp_alive?", "port_alive?",
-        "curl_via_proxy", "probe_opencode_endpoint", "app_probe_ok?",
-        "trial_vless_url", "fetch_first_working", "do_failover",
+        "curl_via_proxy", "probe_endpoint", "app_probe_ok?",
+        "trial_url", "fetch_first_working", "handle_failover",
       }
 
       # # `def`s that may be invoked as `name.call(...)` (lambdas stored in
-      # # variables, e.g. `do_failover = ->(t : String) do ... end`).
+      # # variables, e.g. `handle_failover = ->(t : String) do ... end`).
       CALLABLE_SUFFIX = ".call"
 
       def id : String
@@ -145,7 +145,7 @@ module Catalyst
       end
 
       # # `foo` or `foo.call` (lambda) → worker name or nil.
-      # # Note: `do_failover.call("usr1")` parses with `obj` as a bare
+      # # Note: `handle_failover.call("sig")` parses with `obj` as a bare
       # # `Var`, not a zero-arg `Call` — handle both shapes.
       private def callee_name(node : Crystal::Call) : String?
         if node.name == "call" && (obj = node.obj)

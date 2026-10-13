@@ -7,7 +7,7 @@ module Catalyst
 
       describe "#check" do
         it "detects Process.new lexically inside spawn" do
-          assert_finding(rule, "spawn { Process.new(\"xray\", args: [\"run\"]) }")
+          assert_finding(rule, "spawn { Process.new(\"worker\", args: [\"run\"]) }")
         end
 
         it "detects Process.run lexically inside spawn" do
@@ -27,7 +27,7 @@ module Catalyst
         end
 
         it "detects system() inside spawn" do
-          assert_finding(rule, %q(spawn { system("pkill xray") }))
+          assert_finding(rule, %q(spawn { system("pkill worker") }))
         end
 
         it "ignores sleep 0 inside spawn (yield idiom, CAT-042)" do
@@ -51,23 +51,23 @@ module Catalyst
         end
 
         it "ignores the same calls outside spawn" do
-          assert_no_finding(rule, %q(Process.new("xray", args: ["run"])))
+          assert_no_finding(rule, %q(Process.new("worker", args: ["run"])))
           assert_no_finding(rule, "sleep 1.8")
           assert_no_finding(rule, %q(HTTP::Client.get("http://x")))
         end
 
         it "detects worker wrapper calls inside spawn" do
-          assert_finding(rule, "spawn { test_config(url, ip, port) }")
+          assert_finding(rule, "spawn { check_config(url, ip, port) }")
         end
 
         it "detects blocking primitives inside defs called from spawn" do
           code = <<-CRYSTAL
-            def test_config(url : String) : String?
-              xray = Process.new("xray", args: ["run"])
+            def check_config(url : String) : String?
+              worker = Process.new("worker", args: ["run"])
               sleep 1.8
             end
             spawn do
-              test_config("x")
+              check_config("x")
             end
             CRYSTAL
           results = run_rule(rule, code)
@@ -78,23 +78,23 @@ module Catalyst
         it "resolves forward references (spawn before def)" do
           code = <<-CRYSTAL
             spawn do
-              test_config("x")
+              check_config("x")
             end
-            def test_config(url : String) : String?
-              xray = Process.new("xray", args: ["run"])
+            def check_config(url : String) : String?
+              worker = Process.new("worker", args: ["run"])
             end
             CRYSTAL
           results = run_rule(rule, code)
           results.size.should eq(2)
         end
 
-        it "follows lambda .call chains (do_failover)" do
+        it "follows lambda .call chains (handle_failover)" do
           code = <<-CRYSTAL
-            do_failover = ->(trigger : String) do
-              Process.new("xray", args: ["run"])
+            handle_failover = ->(trigger : String) do
+              Process.new("worker", args: ["run"])
             end
             spawn do
-              do_failover.call("usr1")
+              handle_failover.call("sig")
             end
             CRYSTAL
           results = run_rule(rule, code)
@@ -105,7 +105,7 @@ module Catalyst
           code = <<-CRYSTAL
             Process.run("curl", args: ["-s"])
             sleep 2
-            system("pkill xray")
+            system("pkill worker")
             CRYSTAL
           assert_no_finding(rule, code)
         end
