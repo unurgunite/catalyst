@@ -3,18 +3,17 @@ module Catalyst
     # # Fiber fan-out: `N.times { spawn }` × semaphore permits.
     ##
     # # A worker pool shaped as `FIBERS.times { spawn { ... } }` gated by a
-    # # `Channel(Nil)` counting semaphore segfaulted in production at
-    # # 50 fibers × 100 permits (`Fiber::ExecutionContext::ThreadPool`
-    # # starvation under hanging TCP + subprocess load). This rule
-    # # multiplies the two sides and flags products over the threshold.
+    # # `Channel(Nil)` counting semaphore segfaulted in production
+    # # (`Fiber::ExecutionContext::ThreadPool` starvation under hanging
+    # # network I/O + subprocess load). This rule multiplies the two sides
+    # # and flags products over the threshold.
     # #
     # # Three tiers (maximum statically resolvable precision):
     # # - both sides resolve to ints and the product exceeds the threshold
     # #   → `warning`/`medium` on the `spawn` line, showing F×P=N;
     # # - the `times → spawn` + `Channel(Nil)` semaphore shape matches but
-    # #   some operand comes from config/CLI/args (unresolvable statically —
-    # #   the actual production case: `FIBER_COUNT` from ARGV, permits from
-    # #   YAML) → single `info`/`low` per file: verify F×P ≤ threshold;
+    # #   some operand comes from config/CLI/args (unresolvable statically)
+    # #   → single `info`/`low` per file: verify F×P ≤ threshold;
     # # - anything else (producers, collectors, prefills, `each` without
     # #   spawn, bare `spawn`, resolved products ≤ threshold) → silent.
     # #
@@ -24,7 +23,6 @@ module Catalyst
     # # and one-shot rendezvous never match.
     class SpawnFanOut < Rule
       # # Fibers × permits above this are a thread-pool starvation risk.
-      # # Calibrated on one incident (50×100=5000 crashed, 8×8=64 lives).
       FAN_OUT_THRESHOLD = 1000
 
       def id : String
@@ -228,7 +226,7 @@ module Catalyst
           file: context.file,
           line: line,
           column: col,
-          suggestion: "Lower `threads`/`max_concurrent_xray` so fibers x permits <= #{FAN_OUT_THRESHOLD}, or batch the queue in chunks with a pause",
+          suggestion: "Lower the fiber count / semaphore permits so fibers x permits <= #{FAN_OUT_THRESHOLD}, or batch the queue in chunks with a pause",
           confidence: "medium",
         )]
       end
@@ -243,7 +241,7 @@ module Catalyst
           file: context.file,
           line: line,
           column: col,
-          suggestion: "Check `threads` x `max_concurrent_xray` in config/CLI (crashed at 50x100=5000); lower them or batch the queue",
+          suggestion: "Check the fiber count x semaphore permits in config/CLI; lower them or batch the queue",
           confidence: "low",
         )]
       end

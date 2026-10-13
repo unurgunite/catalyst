@@ -6,7 +6,7 @@ module Catalyst
       rule = SpawnFanOut.new
 
       describe "#check" do
-        it "detects known 50x100 fan-out" do
+        it "detects known large fan-out" do
           code = <<-CRYSTAL
             semaphore = Channel(Nil).new(100)
             100.times { semaphore.send(nil) }
@@ -42,13 +42,13 @@ module Catalyst
           results.first.message.should contain("5000")
         end
 
-        it "hints on unresolvable config operands (the real crash shape)" do
+        it "hints on unresolvable config operands" do
           code = <<-CRYSTAL
-            FIBER_COUNT = (ARGV.find { |a| a.to_i? } || CONFIG.checker.threads.to_s).to_i
-            MAX_CONCURRENT_XRAY = CONFIG.checker.max_concurrent_xray
-            semaphore = Channel(Nil).new(MAX_CONCURRENT_XRAY)
-            MAX_CONCURRENT_XRAY.times { semaphore.send(nil) }
-            FIBER_COUNT.times do |fiber_id|
+            WORKERS = (ARGV.find { |a| a.to_i? } || settings.workers.to_s).to_i
+            MAX_PERMITS = settings.max_permits
+            semaphore = Channel(Nil).new(MAX_PERMITS)
+            MAX_PERMITS.times { semaphore.send(nil) }
+            WORKERS.times do |worker_id|
               spawn do
                 semaphore.receive
               end
@@ -58,7 +58,7 @@ module Catalyst
           results.size.should eq(1)
           results.first.severity.should eq("info")
           results.first.confidence.should eq("low")
-          results.first.message.should contain("FIBER_COUNT")
+          results.first.message.should contain("WORKERS")
           results.first.message.should contain("semaphore")
         end
 
