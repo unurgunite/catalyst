@@ -55,7 +55,7 @@ POSITIVE_CASES = {
   "CAT-049" => "Thread.new { work }",
   "CAT-050" => "Fiber.new { work }.resume",
   "CAT-051" => "50.times do\n  spawn do\n    semaphore.receive\n  end\nend",
-  "CAT-052" => "spawn { Process.new(\"xray\", args: [\"run\"]) }",
+  "CAT-052" => "spawn { Process.new(\"worker\", args: [\"run\"]) }",
 }
 
 describe "auto_fixable? honesty" do
