@@ -72,7 +72,7 @@ paths:
 
 ## Rules
 
-All 50 rules (CAT-001–CAT-050) are documented in the [Wiki](https://github.com/unurgunite/catalyst/wiki).
+All 52 rules (CAT-001–CAT-052) are documented in the [Wiki](https://github.com/unurgunite/catalyst/wiki).
 
 Quick reference:
 ```bash
