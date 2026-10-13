@@ -5,7 +5,8 @@ module Catalyst
     # # A worker fiber that blocks on `Process.new` (subprocess), a raw socket,
     # # or a bare `sleep` holds an event-loop thread while doing nothing.
     # # At fan-out (dozens of fibers × semaphore permits) this starves
-    # # the fiber thread pool.
+    # # `Fiber::ExecutionContext::ThreadPool` — the shape that segfaulted
+    # # in production.
     # #
     # # Three detection levels, all `warning`/`medium` (never `error`: a
     # # timeout/limit around the call is invisible statically):

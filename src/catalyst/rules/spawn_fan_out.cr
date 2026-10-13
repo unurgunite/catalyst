@@ -3,8 +3,9 @@ module Catalyst
     # # Fiber fan-out: `N.times { spawn }` × semaphore permits.
     ##
     # # A worker pool shaped as `FIBERS.times { spawn { ... } }` gated by a
-    # # `Channel(Nil)` counting semaphore can starve the fiber thread pool
-    # # when both sides grow unchecked. This rule multiplies the two sides
+    # # `Channel(Nil)` counting semaphore segfaulted in production
+    # # (`Fiber::ExecutionContext::ThreadPool` starvation under hanging
+    # # network I/O + subprocess load). This rule multiplies the two sides
     # # and flags products over the threshold.
     # #
     # # Three tiers (maximum statically resolvable precision):
@@ -21,7 +22,7 @@ module Catalyst
     # # / `send(nil)` pairing. Task queues (`Channel(String).new(1024)`)
     # # and one-shot rendezvous never match.
     class SpawnFanOut < Rule
-      # # Fibers × permits above this risk thread-pool exhaustion.
+      # # Fibers × permits above this are a thread-pool starvation risk.
       FAN_OUT_THRESHOLD = 1000
 
       def id : String
@@ -221,7 +222,7 @@ module Catalyst
         [Result.new(
           rule_id: id,
           severity: severity,
-          message: "Fiber fan-out #{fibers} (`#{bound_name}`) x #{permits} (`#{sem}`) = #{product} exceeds #{FAN_OUT_THRESHOLD} — bound the pool",
+          message: "Fiber fan-out #{fibers} (`#{bound_name}`) x #{permits} (`#{sem}`) = #{product} exceeds #{FAN_OUT_THRESHOLD} — thread-pool starvation risk",
           file: context.file,
           line: line,
           column: col,
