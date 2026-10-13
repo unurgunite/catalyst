@@ -30,6 +30,8 @@ category_map = {
   "cat-044" => "math", "cat-045" => "error-handling",
   "cat-049" => "concurrency",
   "cat-050" => "concurrency",
+  "cat-051" => "concurrency",
+  "cat-052" => "concurrency",
 }
 
 results = [] of NamedTuple(
