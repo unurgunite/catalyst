@@ -1,0 +1,75 @@
+require "../../spec_helper"
+
+# All members of this family share `ResourceLeakRule`; only the type they
+# match, their ID and their severity differ. Copy-pasting one file and
+# forgetting to change an ID is the obvious risk, so IDs and severities are
+# asserted per rule as well as the shared detection behavior.
+private def leak_rule(rule : Catalyst::Rule, code : String) : Int32
+  run_rule(rule, code).size
+end
+
+private def all_leak_rules : Array(Catalyst::Rule)
+  [
+    Catalyst::Rules::FileOpenLeak.new.as(Catalyst::Rule),
+    Catalyst::Rules::DirOpenLeak.new.as(Catalyst::Rule),
+    Catalyst::Rules::DbOpenLeak.new.as(Catalyst::Rule),
+    Catalyst::Rules::HttpClientLeak.new.as(Catalyst::Rule),
+    Catalyst::Rules::TcpSocketLeak.new.as(Catalyst::Rule),
+    Catalyst::Rules::TempfileLeak.new.as(Catalyst::Rule),
+  ]
+end
+
+describe Catalyst::Rules::ResourceLeakRule do
+  describe "identity" do
+    it "uses a distinct rule ID per resource" do
+      ids = all_leak_rules.map(&.id)
+      ids.should eq(%w[CAT-025 CAT-026 CAT-029 CAT-028 CAT-013 CAT-027])
+      ids.uniq.size.should eq(ids.size)
+    end
+
+    it "reports sockets as an error and other leaks as warnings or info" do
+      Catalyst::Rules::TcpSocketLeak.new.severity.should eq("error")
+      Catalyst::Rules::DirOpenLeak.new.severity.should eq("warning")
+      Catalyst::Rules::FileOpenLeak.new.severity.should eq("info")
+    end
+  end
+
+  describe "detection" do
+    it "reports an unclosed File.open" do
+      leak_rule(Catalyst::Rules::FileOpenLeak.new, %q(f = File.open("x"))).should eq(1)
+    end
+
+    it "reports an unclosed Dir.open" do
+      leak_rule(Catalyst::Rules::DirOpenLeak.new, %q(d = Dir.open("x"))).should eq(1)
+    end
+
+    it "reports an unclosed DB.open" do
+      leak_rule(Catalyst::Rules::DbOpenLeak.new, %q(db = DB.open("sqlite3://x"))).should eq(1)
+    end
+
+    it "reports an unclosed HTTP::Client" do
+      leak_rule(Catalyst::Rules::HttpClientLeak.new, %q(c = HTTP::Client.new("example.com"))).should eq(1)
+    end
+
+    it "reports an unclosed TCPSocket" do
+      leak_rule(Catalyst::Rules::TcpSocketLeak.new, %q(s = TCPSocket.new("host", 80))).should eq(1)
+    end
+
+    it "reports an unclosed Tempfile" do
+      leak_rule(Catalyst::Rules::TempfileLeak.new, %q(t = Tempfile.new("x"))).should eq(1)
+    end
+
+    it "stays silent when the block form closes the resource" do
+      leak_rule(Catalyst::Rules::FileOpenLeak.new, %q(File.open("x") { |f| f.gets })).should eq(0)
+      leak_rule(Catalyst::Rules::TcpSocketLeak.new, %q(TCPSocket.new("host", 80) { |s| s.gets })).should eq(0)
+    end
+
+    it "ignores calls on a different type" do
+      leak_rule(Catalyst::Rules::FileOpenLeak.new, %q(DB.open("x"))).should eq(0)
+    end
+
+    it "ignores a differently named method on the same type" do
+      leak_rule(Catalyst::Rules::FileOpenLeak.new, %q(File.size("x"))).should eq(0)
+    end
+  end
+end

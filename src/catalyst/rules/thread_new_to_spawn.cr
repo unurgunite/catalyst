@@ -9,6 +9,12 @@ module Catalyst
         "info"
       end
 
+      # # Heuristic and noisy: opt-in only (`--rules #{rid}` or config
+      # # `rules: {#{rid}: {enabled: true}}`).
+      def enabled_by_default? : Bool
+        false
+      end
+
       def description : String
         "Use `spawn` instead of `Thread.new` (only if a fiber, not a thread, is really needed)"
       end

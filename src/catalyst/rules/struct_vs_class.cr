@@ -9,12 +9,27 @@ module Catalyst
     class StructVsClass < Rule
       ACCESSOR_METHODS = {"property", "getter", "setter"}
 
+      # # Classes with more ivars than this are not simple value objects.
+      MAX_IVARS = 4
+
+      @max_ivars = MAX_IVARS
+
+      def configure(params : Hash(String, YAML::Any)) : Nil
+        @max_ivars = int_param(params, "max_ivars", MAX_IVARS)
+      end
+
       def id : String
         "CAT-015"
       end
 
       def severity : String
         "info"
+      end
+
+      # # Heuristic and noisy: opt-in only (`--rules #{rid}` or config
+      # # `rules: {#{rid}: {enabled: true}}`).
+      def enabled_by_default? : Bool
+        false
       end
 
       def description : String
@@ -32,7 +47,7 @@ module Catalyst
         ivar_count, has_non_accessor = analyze_body(node.body)
 
         return [] of Result if has_non_accessor
-        return [] of Result if ivar_count == 0 || ivar_count > 4
+        return [] of Result if ivar_count == 0 || ivar_count > @max_ivars
 
         class_name = node_name_string(node.name)
         line = node.location.try(&.line_number) || 0

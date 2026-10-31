@@ -25,6 +25,12 @@ module Catalyst
       # # Fibers × permits above this are a thread-pool starvation risk.
       FAN_OUT_THRESHOLD = 1000
 
+      @fan_out_threshold = FAN_OUT_THRESHOLD
+
+      def configure(params : Hash(String, YAML::Any)) : Nil
+        @fan_out_threshold = int_param(params, "limit", FAN_OUT_THRESHOLD)
+      end
+
       def id : String
         "CAT-051"
       end
@@ -194,7 +200,7 @@ module Catalyst
         if b = bound
           if c = cap
             product = b * c
-            return [] of Result if product <= FAN_OUT_THRESHOLD
+            return [] of Result if product <= @fan_out_threshold
             emit_known(node, context, bound_name, sem, b, c, product)
           else
             emit_unknown(node, context, bound_name, sem, "#{b} x ?")
@@ -222,11 +228,11 @@ module Catalyst
         [Result.new(
           rule_id: id,
           severity: severity,
-          message: "Fiber fan-out #{fibers} (`#{bound_name}`) x #{permits} (`#{sem}`) = #{product} exceeds #{FAN_OUT_THRESHOLD} — thread-pool starvation risk",
+          message: "Fiber fan-out #{fibers} (`#{bound_name}`) x #{permits} (`#{sem}`) = #{product} exceeds #{@fan_out_threshold} — thread-pool starvation risk",
           file: context.file,
           line: line,
           column: col,
-          suggestion: "Lower the fiber count / semaphore permits so fibers x permits <= #{FAN_OUT_THRESHOLD}, or batch the queue in chunks with a pause",
+          suggestion: "Lower the fiber count / semaphore permits so fibers x permits <= #{@fan_out_threshold}, or batch the queue in chunks with a pause",
           confidence: "medium",
         )]
       end
@@ -237,7 +243,7 @@ module Catalyst
         [Result.new(
           rule_id: id,
           severity: "info",
-          message: "Unbounded fiber fan-out `#{bound_name}` x `#{sem}` (#{shape}; operands from config/CLI are invisible statically) — verify fibers x permits <= #{FAN_OUT_THRESHOLD}",
+          message: "Unbounded fiber fan-out `#{bound_name}` x `#{sem}` (#{shape}; operands from config/CLI are invisible statically) — verify fibers x permits <= #{@fan_out_threshold}",
           file: context.file,
           line: line,
           column: col,

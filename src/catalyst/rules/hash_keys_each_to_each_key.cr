@@ -54,7 +54,7 @@ module Catalyst
           )]
         else
           line_text = context.line_text(line)
-          fix = line_text.gsub(".keys.each", ".each_key")
+          fix = sub_code(line_text, ".keys.each", ".each_key")
 
           [Result.new(
             rule_id: id,

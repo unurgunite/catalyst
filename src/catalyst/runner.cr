@@ -5,6 +5,10 @@ module Catalyst
   # # Collects source files, parses with `Crystal::Parser`, dispatches AST to rules.
   class Runner
     @rules : Array(Rule)
+    # # Number of files that could not be read or parsed on the last run.
+    # # Non-zero means the result set may be incomplete, so `--ci` must not
+    # # report success on it.
+    getter errors : Int32 = 0
 
     # # Initialize with config and CLI options. Loads active rules.
     def initialize(@config : Config, @options : Options)
@@ -13,6 +17,7 @@ module Catalyst
 
     # # Process all paths and return findings.
     def run(paths : Array(String)) : Array(Result)
+      @errors = 0
       effective_paths = paths.empty? ? @config.paths : paths
       files = collect_files(effective_paths)
       results = [] of Result
@@ -33,9 +38,11 @@ module Catalyst
 
         results.concat(visitor.results)
       rescue ex : Crystal::SyntaxException
+        @errors += 1
         STDERR.puts "catalyst: parse error in #{file}: #{ex.message}"
-      rescue ex
-        STDERR.puts "catalyst: error processing #{file}: #{ex.message}"
+      rescue ex : File::Error | IO::Error
+        @errors += 1
+        STDERR.puts "catalyst: cannot read #{file}: #{ex.message}"
       end
 
       apply_severity_overrides(results)
@@ -166,25 +173,38 @@ module Catalyst
           Dir.glob("#{normalized}/**/*.cr").each { |file| files << file }
         elsif File.file?(normalized) && normalized.ends_with?(".cr")
           files << normalized
+        else
+          # A typo'd path would otherwise shrink the file list silently and
+          # produce a clean exit 0 on code that was never analyzed.
+          STDERR.puts "catalyst: no such file or directory: #{path}"
+          @errors += 1
         end
       end
+      # Overlapping inputs (a directory plus a file inside it) must not be
+      # analyzed — or fixed — twice.
+      files.uniq!
       files.reject! do |file|
-        @config.ignore.any? { |pattern| File.match?(pattern, file) }
+        @config.ignore.any? { |pattern| File.match?(pattern.gsub("\\", "/"), file) }
       end
       files.sort!
       files
     end
 
+    # # Build the active rule list from defaults, CLI allow/deny lists and
+    # # config overrides. Opt-in rules are reachable through both `--rules`
+    # # and `rules: {CAT-XXX: {enabled: true}}`.
     private def load_rules : Array(Rule)
       rules = Rule.all.select(&.enabled_by_default?)
 
       if allowlist = @options.rules
         wanted = allowlist.map(&.strip).reject(&.empty?).to_set
-        known = rules.map(&.id).to_set
+        # Compare against every registered rule, not just default-on ones,
+        # otherwise `--rules CAT-038` warns "unknown" and then yields nothing.
+        known = Rule.all.map(&.id).to_set
         (wanted - known).each do |id|
           STDERR.puts "catalyst: warning: unknown rule #{id} in --rules"
         end
-        rules.select! { |rule| wanted.includes?(rule.id) }
+        rules = Rule.all.select { |rule| wanted.includes?(rule.id) }
       end
 
       if denylist = @options.ignore
@@ -193,9 +213,19 @@ module Catalyst
       end
 
       @config.rules.each do |id, rule_config|
-        unless rule_config.enabled?
+        if rule_config.enabled?
+          # Re-add an opt-in rule the config asks for.
+          if rule = Rule.all.find { |candidate| candidate.id == id }
+            rules << rule unless rules.any? { |active| active.id == id }
+          end
+        else
           rules.reject! { |rule| rule.id == id }
         end
+      end
+
+      rules.each do |rule|
+        params = @config.rules[rule.id]?.try(&.params)
+        rule.configure(params) if params
       end
 
       rules

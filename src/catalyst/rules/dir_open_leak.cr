@@ -1,6 +1,7 @@
 module Catalyst
   module Rules
-    class DirOpenLeak < Rule
+    # # CAT-026: Dir.open resource leak — use block form to auto-close
+    class DirOpenLeak < ResourceLeakRule
       def id : String
         "CAT-026"
       end
@@ -13,32 +14,20 @@ module Catalyst
         "Dir.open resource leak — use block form to auto-close"
       end
 
-      def check(node : Crystal::ASTNode, context : Context) : Array(Result)
-        call = dir_open_call(node)
-        return [] of Result unless call
-
-        line = call.location.try(&.line_number) || 0
-        col = call.name_location.try(&.column_number) || 0
-
-        [Result.new(
-          rule_id: id,
-          severity: severity,
-          message: "Dir.open resource leak — use block form to auto-close directory",
-          file: context.file,
-          line: line,
-          column: col,
-          suggestion: "Use block form: `Dir.open(path) { |d| ... }`",
-          confidence: "high"
-        )]
+      def acquire_method : String
+        "open"
       end
 
-      private def dir_open_call(node : Crystal::ASTNode) : Crystal::Call?
-        return nil unless node.is_a?(Crystal::Call)
-        return nil unless node.name == "open"
-        return nil unless (obj = node.obj).is_a?(Crystal::Path)
-        return nil unless obj.names == %w[Dir]
-        return nil unless node.block.nil?
-        node
+      def resource_type : String
+        "Dir"
+      end
+
+      def message : String
+        "Dir.open resource leak — use block form to auto-close directory"
+      end
+
+      def suggestion : String
+        "Use block form: `Dir.open(path) { |d| ... }`"
       end
 
       Rule.all << self.new

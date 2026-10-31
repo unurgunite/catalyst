@@ -1,19 +1,12 @@
 module Catalyst
   module Rules
     class ParseToConstant < Rule
+      include LoopTracking
       PARSE_TYPES = {
         "URI"         => ["URI"],
         "Time"        => ["Time"],
         "Time::Parse" => ["Time", "Format"],
       }
-
-      # # Block methods that imply repeated execution of their body.
-      LOOP_BLOCK_METHODS = {
-        "each", "each_with_index", "each_with_object",
-        "times", "upto", "downto", "step", "loop",
-      }
-
-      @loop_depth : Int32 = 0
 
       def id : String
         "CAT-041"
@@ -28,7 +21,7 @@ module Catalyst
       end
 
       def setup(file_path : String, source : String) : Nil
-        @loop_depth = 0
+        super
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
@@ -80,26 +73,6 @@ module Catalyst
           suggestion: suggestion,
           confidence: confidence,
         )]
-      end
-
-      private def track_enter(node : Crystal::ASTNode) : Nil
-        @loop_depth += 1 if loop_opener?(node)
-      end
-
-      private def track_leave(node : Crystal::ASTNode) : Nil
-        @loop_depth -= 1 if loop_opener?(node)
-      end
-
-      private def loop_opener?(node : Crystal::ASTNode) : Bool
-        case node
-        when Crystal::While, Crystal::Until
-          true
-        when Crystal::Block
-          call = node.call
-          call.is_a?(Crystal::Call) && LOOP_BLOCK_METHODS.includes?(call.name)
-        else
-          false
-        end
       end
 
       Rule.all << self.new

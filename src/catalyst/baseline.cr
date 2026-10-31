@@ -16,16 +16,29 @@ module Catalyst
 
     # # Load known keys from a baseline file. Missing file means everything
     # # is new — the correct behavior for a gate on first run.
+    # # Raises `ConfigError` on unreadable or corrupt content: silently treating
+    # # a corrupt baseline as "no baseline" would report every finding as new,
+    # # and silently treating it as "everything known" would hide them.
     def self.load(path : String) : Set(String)
       return Set(String).new unless File.exists?(path)
 
-      Array(String).from_json(File.read(path)).to_set
+      begin
+        Array(String).from_json(File.read(path)).to_set
+      rescue ex : JSON::ParseException
+        raise ConfigError.new("baseline #{path} is not valid JSON: #{ex.message}")
+      rescue ex : File::Error | IO::Error
+        raise ConfigError.new("baseline #{path} could not be read: #{ex.message}")
+      end
     end
 
     # # Write all findings as the new baseline. Returns the entry count.
     def self.write(path : String, results : Array(Result)) : Int32
       keys = results.map { |result| key(result) }.sort!.uniq!
-      File.write(path, keys.to_json)
+      begin
+        File.write(path, keys.to_json)
+      rescue ex : File::Error | IO::Error
+        raise ConfigError.new("baseline #{path} could not be written: #{ex.message}")
+      end
       keys.size
     end
 

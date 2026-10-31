@@ -33,6 +33,21 @@ module Catalyst
       false
     end
 
+    # # Apply config `params` for this rule. Override to read tuning values
+    # # from `rules: {CAT-004: {params: {limit: 16}}}`.
+    # # Unknown keys are ignored; invalid values fall back to the default.
+    def configure(params : Hash(String, YAML::Any)) : Nil
+    end
+
+    # # Read an integer param, falling back to `default` when absent or junk.
+    protected def int_param(params : Hash(String, YAML::Any), key : String, default : Int32) : Int32
+      value = params[key]?
+      return default unless value
+      value.as_i? || default
+    rescue
+      default
+    end
+
     # # Called once per file before AST traversal.
     # # Override to set up per-file state.
     def setup(file_path : String, source : String) : Nil
@@ -49,6 +64,77 @@ module Catalyst
     # # Override to provide auto-fix source replacement.
     def fix(node : Crystal::ASTNode) : String?
       nil
+    end
+
+    # # Replace `pattern` with `replacement` in a source line, but only in
+    # # code: occurrences inside string literals or comments are left alone.
+    ##
+    # # Returns nil when the pattern does not occur in code, so callers never
+    # # produce a no-op fix. A rewrite limited to code means a line such as
+    # # `puts "sort.first" # see sort.first` keeps both literals intact.
+    protected def sub_code(line : String, pattern : Regex | String, replacement : String) : String?
+      regex = pattern.is_a?(Regex) ? pattern : Regex.new(Regex.escape(pattern))
+      masked = mask_literals(line)
+      matched = masked.match(regex, masked.index(regex) || 0)
+      return nil unless matched
+      line[0...matched.begin(0)] + replacement + line[matched.end(0)..]
+    end
+
+    # # Like `#sub_code`, but requires exactly one occurrence in code.
+    # # Ambiguous lines get no fix rather than an arbitrary one.
+    protected def sub_code_once(line : String, pattern : Regex | String, replacement : String) : String?
+      first = sub_code(line, pattern, replacement)
+      return nil unless first
+      # A second occurrence in the rewritten line means the original had two.
+      return nil if sub_code(first, pattern, replacement)
+      first
+    end
+
+    # # Blank out string-literal and comment contents, preserving length and
+    # # offsets so indexes into the result are valid in the original line.
+    private def mask_literals(line : String) : String
+      chars = line.chars
+      i = 0
+      while i < chars.size
+        case chars[i]
+        when '#'
+          # A `#{` inside a string is consumed by the string branch below;
+          # reaching `#` here means the rest of the line is a comment.
+          (i...chars.size).each { |j| chars[j] = ' ' }
+          break
+        when '\''
+          i = mask_quoted(chars, i, '\'')
+        when '"'
+          i = mask_quoted(chars, i, '"')
+        else
+          i += 1
+        end
+      end
+      chars.join
+    end
+
+    # Mask a single- or double-quoted literal starting at `start`, returning
+    # the index just past its closing quote.
+    private def mask_quoted(chars : Array(Char), start : Int32, quote : Char) : Int32
+      j = start + 1
+      while j < chars.size
+        if chars[j] == '\\'
+          j += 2
+          next
+        end
+        if chars[j] == quote
+          mask_span(chars, start, j)
+          return j + 1
+        end
+        j += 1
+      end
+      # Unterminated on this line (multi-line string / heredoc): mask to EOL.
+      mask_span(chars, start, chars.size - 1)
+      chars.size
+    end
+
+    private def mask_span(chars : Array(Char), from : Int32, to : Int32) : Nil
+      (from..to).each { |k| chars[k] = ' ' if k >= 0 && k < chars.size }
     end
 
     # # Register this rule in the global registry `Rule.all`.
