@@ -17,6 +17,7 @@ module Catalyst
         parser.on("--format FORMAT", "Output format: terminal|json|sarif") { |v| options.format = v }
         parser.on("--severity LEVEL", "Minimum severity: error|warning|info|hint") { |v| options.min_severity = v }
         parser.on("--fix", "Apply safe auto-fixes") { options.fix = true }
+        parser.on("--dry-run", "Show what --fix would change without writing") { options.dry_run = true }
         parser.on("--ci", "CI mode — exit code 1 on any finding") { options.ci = true }
         parser.on("--rules RULES", "Comma-separated rule IDs to enable") { |v| options.rules = v.split(",") }
         parser.on("--ignore RULES", "Comma-separated rule IDs to disable") { |v| options.ignore = v.split(",") }
@@ -44,17 +45,47 @@ module Catalyst
         STDERR.puts "catalyst: #{ex.message}"
         return 2
       end
+
+      # CLI flags win over the config file; the config is the fallback.
+      if severity = options.min_severity
+        unless SEVERITY_LEVELS.includes?(severity)
+          STDERR.puts "catalyst: invalid --severity #{severity.inspect} (expected #{SEVERITY_LEVELS.join("|")})"
+          return 2
+        end
+        config.severity = severity
+      end
+      if format = options.format
+        config.format = format
+      end
+
+      # Validate before a long run: Formatter.for falls back to terminal for
+      # anything it does not know, so a typo would silently change output.
+      unless FORMATS.includes?(config.format.downcase)
+        STDERR.puts "catalyst: invalid format #{config.format.inspect} (expected #{FORMATS.join("|")})"
+        return 2
+      end
+
       runner = Runner.new(config, options)
       results = runner.run(args)
 
-      formatter = Formatter.for(options.format || config.format)
-      formatter.output(results, STDOUT, config.severity)
+      begin
+        formatter = Formatter.for(config.format)
+        formatter.output(results, STDOUT, config.severity)
+      rescue ex : ArgumentError
+        STDERR.puts "catalyst: #{ex.message}"
+        return 2
+      end
 
       if options.ci? && !results.empty?
         return 1
       end
       0
     end
+
+    # # Severity levels, most to least severe.
+    SEVERITY_LEVELS = %w[error warning info hint]
+    # # Supported output formats.
+    FORMATS = %w[terminal json sarif]
 
     private def self.list_rules
       if Rule.all.empty?
@@ -71,12 +102,14 @@ module Catalyst
 
   # # CLI flags and options parsed from ARGV.
   struct Options
-    # # Output format: terminal, json, or sarif.
-    property format : String = "terminal"
-    # # Minimum severity to display.
-    property min_severity : String = "hint"
+    # # Output format from `--format`; nil means use the config value.
+    property format : String? = nil
+    # # Minimum severity from `--severity`; nil means use the config value.
+    property min_severity : String? = nil
     # # Apply safe auto-fixes.
     property? fix : Bool = false
+    # # Report what `--fix` would change without writing anything.
+    property? dry_run : Bool = false
     # # CI mode — exit code 1 on findings.
     property? ci : Bool = false
     # # Comma-separated rule IDs to enable (optional).

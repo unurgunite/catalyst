@@ -22,7 +22,9 @@ POSITIVE_CASES = {
   "CAT-016" => "def f : Int32 | String | Bool | Float64\nend",
   "CAT-017" => "Time.local(2024, 1, 1)",
   "CAT-018" => "if s.match(/re/)\nend",
-  "CAT-019" => %q(Regex.new("pattern")),
+  # CAT-019 only fixes a bare call statement in a constant-legal scope; a
+  # call in a method body gets the finding without a fix.
+  "CAT-019" => "class Foo\n  Regex.new(\"pattern\")\nend",
   "CAT-020" => "IO::Memory.new.to_s",
   "CAT-021" => "h.values.each { |v| puts v }",
   "CAT-022" => "[1, 2, 3].shuffle.first",
