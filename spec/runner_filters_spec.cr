@@ -124,11 +124,24 @@ describe Catalyst::Runner do
   end
 
   describe "file collection" do
-    it "analyzes an overlapping file only once" do
+    # Windows used to analyze the same file twice when a directory and a file
+    # inside it were both passed: File.join produced `C:\dir\a.cr`, the glob
+    # result came back as `C:/dir/a.cr`, and `uniq!` compared raw strings.
+    # `./` segments give the same mismatch on any platform.
+    it "recognizes a different spelling of the same file" do
       temp_dir do |dir|
         path = write(dir, "a.cr", "[3, 1].sort.first\n")
-        results = Catalyst::Runner.new(full_config, Catalyst::Options.new).run([dir, path])
-        results.count { |result| result.rule_id == "CAT-001" }.should eq(1)
+        alternate = path.sub("/a.cr", "/./a.cr")
+        runner = Catalyst::Runner.new(full_config, Catalyst::Options.new)
+        runner.collect_files_for_test([path, alternate]).size.should eq(1)
+      end
+    end
+
+    it "analyzes an overlapping directory and file only once" do
+      temp_dir do |dir|
+        path = write(dir, "a.cr", "[3, 1].sort.first\n")
+        runner = Catalyst::Runner.new(full_config, Catalyst::Options.new)
+        runner.collect_files_for_test([dir, path]).size.should eq(1)
       end
     end
 

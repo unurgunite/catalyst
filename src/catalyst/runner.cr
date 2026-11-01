@@ -180,9 +180,12 @@ module Catalyst
           @errors += 1
         end
       end
-      # Overlapping inputs (a directory plus a file inside it) must not be
-      # analyzed — or fixed — twice.
-      files.uniq!
+      # De-dupe by file identity, not by string spelling: the same file can
+      # arrive as `C:\dir\a.cr` (File.join), `C:/dir/a.cr` (normalized) or
+      # with different casing, and a directory plus a file inside it yields
+      # two entries anyway. Comparing spellings let the file be analyzed —
+      # and fixed — twice on Windows. `File.same?` answers for the platform.
+      files = dedupe(files)
       files.reject! do |file|
         @config.ignore.any? { |pattern| File.match?(pattern.gsub("\\", "/"), file) }
       end
@@ -193,6 +196,32 @@ module Catalyst
     # # Build the active rule list from defaults, CLI allow/deny lists and
     # # config overrides. Opt-in rules are reachable through both `--rules`
     # # and `rules: {CAT-XXX: {enabled: true}}`.
+    # # Test seam: `collect_files` is private but the de-duplication rule is
+    # # exactly what regressed on Windows, so specs assert it directly.
+    def collect_files_for_test(paths : Array(String)) : Array(String)
+      collect_files(paths)
+    end
+
+    # # Drop repeated files, keeping the first spelling of each.
+    # # `File.same?` compares the underlying file, so separator style, `.`
+    # # segments and (on Windows) casing do not create duplicates. It raises
+    # # for paths that no longer exist, hence the fallback to spelling.
+    private def dedupe(files : Array(String)) : Array(String)
+      kept = [] of String
+      files.each do |file|
+        duplicate = kept.any? { |other| same_file?(file, other) }
+        kept << file unless duplicate
+      end
+      kept
+    end
+
+    # # `File.same?` raises for a path that vanished between glob and here.
+    private def same_file?(one : String, two : String) : Bool
+      File.same?(one, two)
+    rescue
+      one == two
+    end
+
     private def load_rules : Array(Rule)
       rules = Rule.all.select(&.enabled_by_default?)
 
