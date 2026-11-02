@@ -1,11 +1,14 @@
 require "benchmark"
 
+# This file times `select{}.first` against `find!`. Rewriting the slow half
+# would compare `find!` with itself and make the benchmark meaningless.
 puts "=== select{}.first vs find!{} ==="
 puts ""
 
 [10, 100, 1_000, 10_000, 100_000].each do |n|
   arr = (1..n).to_a
 
+  # catalyst:disable CAT-008
   select_first = Benchmark.measure { arr.select { |x| x > n / 2 }.first }
   find_bang = Benchmark.measure { arr.find! { |x| x > n / 2 } }
   ratio = find_bang.real > 0 ? (select_first.real / find_bang.real).round(2) : Float64::INFINITY
@@ -20,6 +23,7 @@ puts ""
 [10, 100, 1_000, 10_000, 100_000].each do |n|
   arr = (1..n).to_a
 
+  # catalyst:disable CAT-008
   select_q = Benchmark.measure { arr.select { |x| x > n / 2 }.first? }
   find = Benchmark.measure { arr.find { |x| x > n / 2 } }
   ratio = find.real > 0 ? (select_q.real / find.real).round(2) : Float64::INFINITY
