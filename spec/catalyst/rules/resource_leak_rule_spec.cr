@@ -126,4 +126,15 @@ describe Catalyst::Rules::ResourceLeakRule do
       leak_rule(Catalyst::Rules::TcpSocketLeak.new, code).should eq(1)
     end
   end
+end # A factory hands the handle back and the caller owns it. Closing it
+# inside would break the API, so these are not leaks.
+it "ignores an acquire call returned by the enclosing method" do
+  code = <<-CRYSTAL
+    module Net
+      def self.connect(host, port)
+        TCPSocket.new(host, port)
+      end
+    end
+    CRYSTAL
+  leak_rule(Catalyst::Rules::TcpSocketLeak.new, code).should eq(0)
 end

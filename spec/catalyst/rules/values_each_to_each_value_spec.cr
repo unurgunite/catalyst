@@ -7,15 +7,40 @@ module Catalyst
 
       describe "#check" do
         it "detects values.each with block" do
-          assert_finding(rule, "hash.values.each { |v| v }")
+          assert_finding(rule, <<-CRYSTAL)
+            hash = {"a" => 1}
+            hash.values.each { |v| v }
+            CRYSTAL
         end
 
         it "detects values.each without block" do
-          assert_finding(rule, "hash.values.each")
+          assert_finding(rule, <<-CRYSTAL)
+            hash = {} of String => Int32
+            hash.values.each
+            CRYSTAL
         end
 
-        it "detects values.each with short variable name" do
-          assert_finding(rule, "h.values.each")
+        it "detects values.each on Hash.new" do
+          assert_finding(rule, <<-CRYSTAL)
+            h = Hash(String, Int32).new
+            h.values.each { |v| v }
+            CRYSTAL
+        end
+
+        # `.values` is not a Hash-only method: `Enum.values`, a `getter
+        # values : Array(Tuple)` and an AST node's `values` all reach this
+        # shape, and none of them has `each_value`. Every finding this rule
+        # produced on a 4700-file corpus was of that kind.
+        it "ignores values.each on an enum" do
+          assert_no_finding(rule, "Severity.values.each { |v| v }")
+        end
+
+        it "ignores values.each on a receiver of unknown type" do
+          assert_no_finding(rule, <<-CRYSTAL)
+            def each_value_of(hash)
+              hash.values.each { |v| v }
+            end
+            CRYSTAL
         end
 
         it "ignores each_value (already optimal)" do

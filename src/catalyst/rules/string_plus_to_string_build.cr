@@ -19,13 +19,22 @@ module Catalyst
         "Use `String.build` instead of `String#+` in loops"
       end
 
+      def initialize
+        @macro_depth = 0
+      end
+
       def setup(file_path : String, source : String) : Nil
+        @macro_depth = 0
         super
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         track_enter(node)
         return [] of Result unless in_loop?
+        # `String.build` does not exist while a macro expands, so a
+        # concatenation written in macro code cannot be rewritten. Code
+        # generators build strings this way legitimately.
+        return [] of Result if @macro_depth > 0
 
         result = check_string_plus(node, context)
         result || [] of Result
@@ -33,6 +42,12 @@ module Catalyst
 
       def end_visit(node : Crystal::ASTNode) : Nil
         track_leave(node)
+        @macro_depth -= 1 if node.is_a?(Crystal::Macro)
+      end
+
+      def visit(node : Crystal::Macro) : Bool
+        @macro_depth += 1
+        true
       end
 
       # Check a single node for string concatenation patterns.
