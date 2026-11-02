@@ -132,7 +132,7 @@ module Catalyst
     private def rewrite(source : String, file : String, file_results : Array(Result)) : String
       lines = source.lines
 
-      # One line may host several findings (e.g. CAT-019 + CAT-039). Applying
+      # One line may host several findings. Applying
       # the whole line twice would drop the second fix, so only the first
       # replacement per line is applied and the rest are reported as skipped.
       applied_lines = Set(Int32).new

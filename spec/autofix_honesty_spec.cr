@@ -22,9 +22,6 @@ POSITIVE_CASES = {
   "CAT-016" => "def f : Int32 | String | Bool | Float64\nend",
   "CAT-017" => "Time.local(2024, 1, 1)",
   "CAT-018" => "if s.match(/re/)\nend",
-  # CAT-019 only fixes a bare call statement in a constant-legal scope; a
-  # call in a method body gets the finding without a fix.
-  "CAT-019" => "class Foo\n  Regex.new(\"pattern\")\nend",
   "CAT-020" => "IO::Memory.new.to_s",
   "CAT-021" => "h.values.each { |v| puts v }",
   "CAT-022" => "[1, 2, 3].shuffle.first",
@@ -43,8 +40,10 @@ POSITIVE_CASES = {
   "CAT-035" => %q(s.split("")),
   "CAT-037" => %q(log.info("x=#{x}")),
   "CAT-038" => "Array(Int32).new",
-  "CAT-039" => "def f\n  Regex.new(\"x\")\nend",
-  "CAT-041" => %q(URI.parse("https://example.com")),
+  # Only a bare call statement in a constant-legal scope is rewritten;
+  # inside a `def` a constant would be a dynamic assignment.
+  "CAT-039" => "class Foo\n  Regex.new(\"x\")\nend",
+  "CAT-041" => %q(names.each { |n| URI.parse("https://example.com") }),
   "CAT-042" => "sleep(0)",
   "CAT-043" => "Random.new.rand",
   "CAT-045" => "def f\n  raise \"x\"\nend",

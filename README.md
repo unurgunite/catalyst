@@ -101,7 +101,7 @@ call, so it is opt-in rather than built in.
 
 ## Rules
 
-All 46 rules are documented in the [Wiki](https://github.com/unurgunite/catalyst/wiki). Numbers are not contiguous: CAT-036, 040, 044, 046, 047 and 048 were removed, and their numbers stay retired so an old `ignore` entry still means what it did.
+All 45 rules are documented in the [Wiki](https://github.com/unurgunite/catalyst/wiki). Numbers are not contiguous: CAT-019, 036, 040, 044, 046, 047 and 048 were removed, and their numbers stay retired so an old `ignore` entry still means what it did.
 
 Quick reference:
 ```bash

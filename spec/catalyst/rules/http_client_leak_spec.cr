@@ -20,8 +20,10 @@ module Catalyst
           )
         end
 
-        it "detects HTTP::Client.new even with .close call present" do
-          assert_finding(rule, <<-CRYSTAL
+        # This used to assert a finding: the rule only looked for the
+        # block form and never saw a following `close`.
+        it "ignores a client closed a line later at top level" do
+          assert_no_finding(rule, <<-CRYSTAL
             c = HTTP::Client.new("https://example.com")
             c.close
             CRYSTAL

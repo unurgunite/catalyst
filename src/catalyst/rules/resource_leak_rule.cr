@@ -64,7 +64,7 @@ module Catalyst
         start = enclosing_method_start(line)
         finish = method_end(start)
         return false unless finish
-        body = @source_lines[(start + 1)...finish].join('\n')
+        body = @source_lines[(start + 1)..finish].join('\n')
         body.matches?(/\bclose\b|\bat_exit\b|\bensure\b/)
       end
 
