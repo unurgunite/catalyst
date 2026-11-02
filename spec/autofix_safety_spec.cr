@@ -23,6 +23,6 @@ describe "auto-fix rewriting" do
   end
 
   it "rewrites keys.each to each_key" do
-    fix_for(Catalyst::Rules::HashKeysEachToEachKey.new, "h.keys.each { |k| k }").should eq("h.each_key { |k| k }")
+    fix_for(Catalyst::Rules::HashKeysEachToEachKey.new, "h = {\"a\" => 1}\nh.keys.each { |k| k }").should eq("h.each_key { |k| k }")
   end
 end

@@ -27,6 +27,15 @@ module Catalyst
         "Use streaming instead of reading entire file at once"
       end
 
+      # # Whether a file is read whole or streamed cannot be decided from its
+      # # source: the size is not in the code, and most whole-file reads are
+      # # configs and fixtures where `File.read` is the right call. On 3166
+      # # third-party files every finding was of that kind — tests reading
+      # # fixtures, and methods returning `String` where streaming cannot fit.
+      def enabled_by_default? : Bool
+        false
+      end
+
       def auto_fixable? : Bool
         false
       end

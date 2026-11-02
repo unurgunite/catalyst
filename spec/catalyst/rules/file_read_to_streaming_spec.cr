@@ -92,6 +92,14 @@ module Catalyst
         end
       end
 
+      describe "#enabled_by_default?" do
+        # Whole-file reads are the right call for configs and fixtures, and
+        # the file size that would tell them apart is not in the source.
+        it "is false, so the rule is opt-in" do
+          rule.enabled_by_default?.should be_false
+        end
+      end
+
       describe "#description" do
         it "returns description text" do
           rule.description.should contain("streaming")

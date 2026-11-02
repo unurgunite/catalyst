@@ -103,6 +103,17 @@ call, so it is opt-in rather than built in.
 
 All 44 rules are documented in the [Wiki](https://github.com/unurgunite/catalyst/wiki). Numbers are not contiguous: CAT-019, 024, 036, 040, 044, 046, 047 and 048 were removed, and their numbers stay retired so an old `ignore` entry still means what it did.
 
+Two rules are off by default, because their advice cannot be told apart
+from correct code by looking at the source:
+
+| Rule | Why it is off | Turn it on with |
+|------|---------------|-----------------|
+| CAT-014 | Whether a file is read whole or streamed depends on its size, which is not in the code. On 3166 third-party files all 49 findings were `File.read` on a config, a test fixture, or a method returning `String`. | `--rules CAT-014` |
+| CAT-016 | Union type capacity hints depend on how the program is deployed. | `rules: {CAT-016: {enabled: true}}` |
+
+Either form works for both; `--rules` re-enables a rule for one run, a
+config entry for good.
+
 Quick reference:
 ```bash
 catalyst --list-rules
@@ -112,8 +123,19 @@ catalyst --list-rules
 
 ```bash
 crystal spec
-catalyst src/
-ameba src/
+crystal run bin/ameba.cr --
+crystal tool format --check
+```
+
+Two things the spec suite cannot check on its own:
+
+```bash
+# Apply every fix and compile the result. A fix can emit code that parses
+# but does not build, which no assertion in the suite would notice.
+crystal run scripts/check_fix_compiles.cr -- --run
+
+# Compile every benchmark under bench/. CI runs this on each push.
+for file in bench/cat-*/*.cr; do crystal build --no-codegen "$file"; done
 ```
 
 ## License
