@@ -11,7 +11,8 @@ module Catalyst
     getter errors : Int32 = 0
 
     # # Initialize with config and CLI options. Loads active rules.
-    def initialize(@config : Config, @options : Options)
+    # # Diagnostics go to `io` so tests can read them; the CLI passes STDERR.
+    def initialize(@config : Config, @options : Options, @io : IO = STDERR)
       @rules = load_rules
     end
 
@@ -39,10 +40,10 @@ module Catalyst
         results.concat(visitor.results)
       rescue ex : Crystal::SyntaxException
         @errors += 1
-        STDERR.puts "catalyst: parse error in #{file}: #{ex.message}"
+        @io.puts "catalyst: parse error in #{file}: #{ex.message}"
       rescue ex : File::Error | IO::Error
         @errors += 1
-        STDERR.puts "catalyst: cannot read #{file}: #{ex.message}"
+        @io.puts "catalyst: cannot read #{file}: #{ex.message}"
       end
 
       apply_severity_overrides(results)
@@ -50,7 +51,7 @@ module Catalyst
 
       if update_path = @options.update_baseline
         count = Baseline.write(update_path, results)
-        STDERR.puts "catalyst: wrote #{count} findings to #{update_path}"
+        @io.puts "catalyst: wrote #{count} findings to #{update_path}"
       end
 
       if baseline_path = (@options.update_baseline || @options.baseline)
@@ -58,7 +59,7 @@ module Catalyst
         results = Baseline.new_findings(results, known)
       end
 
-      if @options.fix?
+      if @options.fix? || @options.dry_run?
         apply_fixes(results)
       end
 
@@ -89,7 +90,7 @@ module Catalyst
     private def apply_fixes(results : Array(Result)) : Nil
       fixable = results.select(&.fix_replacement)
       if fixable.empty?
-        STDERR.puts "catalyst: nothing to fix" if @options.fix? || @options.dry_run?
+        @io.puts "catalyst: nothing to fix" if @options.fix? || @options.dry_run?
         return
       end
 
@@ -103,29 +104,29 @@ module Catalyst
       updated = rewrite(source, file, file_results)
 
       if updated == source
-        STDERR.puts "catalyst: no changes for #{file}"
+        @io.puts "catalyst: no changes for #{file}"
         return
       end
 
       if problem = parse_problem(updated)
-        STDERR.puts "catalyst: skipped unsafe fix in #{file} — result would not parse: #{problem}"
+        @io.puts "catalyst: skipped unsafe fix in #{file} — result would not parse: #{problem}"
         return
       end
 
       if @options.dry_run?
-        STDERR.puts "catalyst: would fix #{file}"
+        @io.puts "catalyst: would fix #{file}"
         return
       end
 
       backup = "#{file}.bak"
       if File.exists?(backup)
-        STDERR.puts "catalyst: backup #{backup} already exists — left untouched"
+        @io.puts "catalyst: backup #{backup} already exists — left untouched"
       else
         File.copy(file, backup)
       end
 
       File.write(file, updated)
-      STDERR.puts "catalyst: fixed #{file} (backup: #{backup})"
+      @io.puts "catalyst: fixed #{file} (backup: #{backup})"
     end
 
     # Applies each replacement to its line and returns the new source.
@@ -140,7 +141,7 @@ module Catalyst
         next if result.line < 1 || result.line > lines.size
         next unless replacement = result.fix_replacement
         unless applied_lines.add?(result.line)
-          STDERR.puts "catalyst: skipped #{result.rule_id} at #{file}:#{result.line} — same line already fixed"
+          @io.puts "catalyst: skipped #{result.rule_id} at #{file}:#{result.line} — same line already fixed"
           next
         end
         lines[result.line - 1] = replacement
@@ -176,7 +177,7 @@ module Catalyst
         else
           # A typo'd path would otherwise shrink the file list silently and
           # produce a clean exit 0 on code that was never analyzed.
-          STDERR.puts "catalyst: no such file or directory: #{path}"
+          @io.puts "catalyst: no such file or directory: #{path}"
           @errors += 1
         end
       end
@@ -231,7 +232,7 @@ module Catalyst
         # otherwise `--rules CAT-038` warns "unknown" and then yields nothing.
         known = Rule.all.map(&.id).to_set
         (wanted - known).each do |id|
-          STDERR.puts "catalyst: warning: unknown rule #{id} in --rules"
+          @io.puts "catalyst: warning: unknown rule #{id} in --rules"
         end
         rules = Rule.all.select { |rule| wanted.includes?(rule.id) }
       end

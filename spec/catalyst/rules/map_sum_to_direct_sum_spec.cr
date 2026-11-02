@@ -57,6 +57,28 @@ module Catalyst
           rule.description.should contain("sum")
         end
       end
+
+      describe "#fix_replacement" do
+        it "folds map into sum" do
+          fix_for(rule, "x = [1, 2].map { |n| n * 2 }.sum").should eq(
+            "x = [1, 2].sum { |n| n * 2 }"
+          )
+        end
+
+        # Folding left the initial value after the block: `sum { ... }(0)`,
+        # which does not parse. Moving it inside needs the block text, so the
+        # rule reports the finding without a fix.
+        it "emits no fix when sum takes an initial value" do
+          fix_for(rule, "x = [1, 2].map { |n| n * 2 }.sum(0)").should be_nil
+        end
+
+        # A greedy body swallowed an enclosing block's closing brace.
+        it "stops at the inner block's closing brace" do
+          fix_for(rule, "b { arr.map { |x| x * 2 }.sum }").should eq(
+            "b { arr.sum { |x| x * 2 } }"
+          )
+        end
+      end
     end
   end
 end
