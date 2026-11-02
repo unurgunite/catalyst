@@ -1,5 +1,13 @@
 module Catalyst
   module Rules
+    # # Flags the two ways of turning a String into per-character work that
+    # # allocate an intermediate array: `split("")` and `chars.each`.
+    # #
+    # # These were two rules (CAT-035 and CAT-036) that suggested the same
+    # # `each_char` rewrite and fired on the same intent. Keeping both meant
+    # # two IDs for one finding, and code that hit one usually hit the other.
+    # # CAT-036's number is retired rather than reused so an old `ignore`
+    # # entry stays meaningful.
     class SplitEmptyToEachChar < Rule
       def id : String
         "CAT-035"
@@ -10,38 +18,48 @@ module Catalyst
       end
 
       def description : String
-        "Use `each_char` instead of `split(\"\")`"
+        "Use `each_char` instead of `split(\"\")` or `chars.each`"
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
-        call = split_empty_candidate(node)
-        return [] of Result unless call
+        return [] of Result unless node.is_a?(Crystal::Call)
 
-        line = call.location.try(&.line_number) || 0
-        col = call.name_location.try(&.column_number) || 0
-
-        [Result.new(
-          rule_id: id,
-          severity: severity,
-          message: "Use `each_char` instead of `split(\"\")` to avoid array allocation",
-          file: context.file,
-          line: line,
-          column: col,
-          suggestion: "Replace `split(\"\")` with `each_char`",
-          confidence: "high",
-        )]
+        if split_empty?(node)
+          [result(node, context, "`split(\"\")`", "Replace `split(\"\")` with `each_char`")]
+        elsif chars_each?(node)
+          [result(node, context, "`chars.each`", "Replace `chars.each` with `each_char`")]
+        else
+          [] of Result
+        end
       end
 
-      private def split_empty_candidate(node : Crystal::ASTNode) : Crystal::Call?
-        return nil unless node.is_a?(Crystal::Call)
-        return nil unless node.name == "split"
-        return nil unless node.args.size == 1
-
+      private def split_empty?(node : Crystal::Call) : Bool
+        return false unless node.name == "split"
+        return false unless node.args.size == 1
         arg = node.args.first
-        return nil unless arg.is_a?(Crystal::StringLiteral)
-        return nil unless arg.value == ""
+        arg.is_a?(Crystal::StringLiteral) && arg.value == ""
+      end
 
-        node
+      private def chars_each?(node : Crystal::Call) : Bool
+        return false unless node.name == "each"
+        target = node.obj
+        return false unless target.is_a?(Crystal::Call)
+        return false unless target.name == "chars"
+        return false unless target.args.empty?
+        target.block.nil?
+      end
+
+      private def result(node : Crystal::Call, context : Context, shape : String, suggestion : String) : Result
+        Result.new(
+          rule_id: id,
+          severity: severity,
+          message: "Use `each_char` instead of #{shape} to avoid an intermediate array allocation",
+          file: context.file,
+          line: node.location.try(&.line_number) || 0,
+          column: node.name_location.try(&.column_number) || 0,
+          suggestion: suggestion,
+          confidence: "high",
+        )
       end
 
       Rule.all << self.new

@@ -21,6 +21,16 @@ module Catalyst
         it "ignores each_char (already optimal)" do
           assert_no_finding(rule, "str.each_char")
         end
+
+        # CAT-036 used to be a separate rule for this shape, suggesting the
+        # same `each_char` rewrite. Both now come from CAT-035.
+        it "detects chars.each" do
+          assert_finding(rule, "str.chars.each { |c| puts c }")
+        end
+
+        it "ignores chars without each" do
+          assert_no_finding(rule, "str.chars")
+        end
       end
 
       describe "#id" do

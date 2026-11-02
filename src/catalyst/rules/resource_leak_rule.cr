@@ -41,6 +41,7 @@ module Catalyst
         line = node.location.try(&.line_number) || 0
         col = node.name_location.try(&.column_number) || 0
         return [] of Result if released_later?(line)
+        return [] of Result if returned_to_caller?(line)
 
         [Result.new(
           rule_id: id,
@@ -64,8 +65,29 @@ module Catalyst
         start = enclosing_method_start(line)
         finish = method_end(start)
         return false unless finish
-        body = @source_lines[(start + 1)...finish].join('\n')
+        body = @source_lines[(start + 1)..finish].join('\n')
         body.matches?(/\bclose\b|\bat_exit\b|\bensure\b/)
+      end
+
+      # # True when the acquire call is the value the enclosing method hands
+      # # back, as in `def connect; DB.open(url); end`. The caller owns the
+      # # resource then, and closing it here would break the API — the usual
+      # # factory shape (`PG.connect`, `Client#open_file`).
+      private def returned_to_caller?(line : Int32) : Bool
+        return false if line <= 0 || line > @source_lines.size
+        start = enclosing_method_start(line)
+        return false if start == 0
+        finish = method_end(start)
+        return false unless finish
+
+        (line...finish).each do |i|
+          text = strip_comment(@source_lines[i]).strip
+          next if text.empty?
+          # Anything between the acquire and the method's end that is not
+          # more of the same statement means the value was consumed here.
+          return false unless text == strip_comment(@source_lines[line - 1]).strip
+        end
+        true
       end
 
       # # Index (0-based) of the `def` line containing `line`, or 0 at top level.
