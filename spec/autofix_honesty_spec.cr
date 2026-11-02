@@ -9,7 +9,7 @@ POSITIVE_CASES = {
   "CAT-003" => "a.select { |x| x }.reject { |x| !x }",
   "CAT-004" => "items.each { |i| [1, 2, 3].includes?(i) }",
   "CAT-005" => "ary.unshift(1)",
-  "CAT-006" => "h.keys.each { |k| puts k }",
+  "CAT-006" => "h = {\"a\" => 1}\nh.keys.each { |k| puts k }",
   "CAT-007" => "ary.reverse.each { |x| puts x }",
   "CAT-008" => "[1, 2, 3].select { |x| x.even? }.first",
   "CAT-009" => "[1, 2].group_by { |x| x }.map { |k, v| v.size }",
