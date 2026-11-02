@@ -71,12 +71,42 @@ module Catalyst
           )
         end
 
+        # Rewriting the first matching text turned the wrong call into
+        # `find!` and left the `.first` in place. The AST names the call.
+        it "rewrites the select that owns the first, not the first select on the line" do
+          fix_for(rule, "x = a.select { |q| q }.map(&.to_s).select { |r| r }.first").should eq(
+            "x = a.select { |q| q }.map(&.to_s).find! { |r| r }"
+          )
+        end
+
         # A greedy body matched past the inner block and swallowed the
         # enclosing block's brace.
         it "stops at the inner block's closing brace" do
           fix_for(rule, "arr.select { |x| x > n / 2 }.first").should eq(
             "arr.find! { |x| x > n / 2 }"
           )
+        end
+
+        # The enclosing block must survive.
+        it "does not swallow an enclosing block's brace" do
+          fix_for(rule, "m = measure { one.select { |x| x > 1 }.first }").should eq(
+            "m = measure { one.find! { |x| x > 1 } }"
+          )
+        end
+
+        it "keeps a receiver whose name contains select" do
+          fix_for(rule, "list.select { |x| x > 1 }.first").should eq(
+            "list.find! { |x| x > 1 }"
+          )
+        end
+
+        it "leaves a multi-line block alone" do
+          code = <<-CR
+            r = list.select do |item|
+              item.active?
+            end.first
+            CR
+          fix_for(rule, code).should be_nil
         end
       end
 
