@@ -194,6 +194,51 @@ module Catalyst
           assert_finding(rule, code, 1)
         end
 
+        # `helper` and `self.helper` both land on a `def` in this file.
+        # `SomeShard.helper` cannot be inspected, so it is not followed.
+        it "follows a call written with an explicit self receiver" do
+          code = <<-CRYSTAL
+            def self.check_config
+              Process.run("worker")
+            end
+
+            spawn do
+              self.check_config
+            end
+            CRYSTAL
+          assert_finding(rule, code, 1)
+        end
+
+        # De-duplication spans the file: an inner spawn re-walks the same
+        # body, and reporting one `sleep` twice says nothing extra.
+        it "reports a nested spawn once" do
+          code = <<-CRYSTAL
+            spawn do
+              spawn do
+                sleep 5
+              end
+            end
+            CRYSTAL
+          assert_finding(rule, code, 1)
+        end
+
+        it "reports a helper reached from two spawns once" do
+          code = <<-CRYSTAL
+            def helper
+              sleep 5
+            end
+
+            spawn do
+              helper
+            end
+
+            spawn do
+              helper
+            end
+            CRYSTAL
+          assert_finding(rule, code, 1)
+        end
+
         # The advice is "add a timeout"; asking for one that is already
         # passed was the most common false positive on real code.
         it "ignores a subprocess that already passes a timeout flag" do

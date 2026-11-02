@@ -56,12 +56,17 @@ module Catalyst
         # # Lines of `spawn` blocks that a sibling `select ... timeout`
         # # bounds, collected in `setup`.
         @bounded_spawn_lines = Set(Int32).new
+        # # Sites already reported for this file. A nested `spawn` reaches an
+        # # inner primitive once per enclosing spawn, so de-duplication has to
+        # # span the whole file, not one block.
+        @reported = Set(String).new
       end
 
       def setup(file_path : String, source : String) : Nil
         @spawn_depth = 0
         @defs.clear
         @bounded_spawn_lines.clear
+        @reported.clear
         index_defs(source)
       end
 
@@ -93,14 +98,13 @@ module Catalyst
       end
 
       # # Walk out from a `spawn` block over method calls into local `def`s.
-      # # Sites are de-duplicated by position: two `spawn` blocks calling the
-      # # same helper both reach the same `sleep`, and reporting it twice
-      # # says nothing extra.
+      # # Sites are de-duplicated by position across the file: two `spawn`
+      # # blocks calling the same helper, or a nested spawn, both reach the
+      # # same `sleep`, and reporting it twice says nothing extra.
       private def check_spawn(block : Crystal::Block, context : Context) : Array(Result)
         results = [] of Result
         sites = [] of Site
         collect_sites(block, sites)
-        seen = Set(String).new
         # The indexer records the `spawn` *call* line; the visitor hands the
         # rule the block, whose own location can differ.
         spawn_line = block.call.try(&.location.try(&.line_number))
@@ -109,7 +113,7 @@ module Catalyst
           next if site.bounded
           location = site.node.location
           key = "#{location.try(&.line_number)}:#{location.try(&.column_number)}"
-          next unless seen.add?(key)
+          next unless @reported.add?(key)
           results << emit(site.node, context, site.describe)
         end
         results
@@ -141,7 +145,7 @@ module Catalyst
       # # bounded by that loop.
       private def follow_calls(node : Crystal::ASTNode, sites : Array(Site), path : Array(String), scope_bounded : Bool)
         return unless node.is_a?(Crystal::Call)
-        return unless node.obj.nil?
+        return unless local_receiver?(node.obj)
         name = node.name
         return if path.includes?(name) || path.size >= MAX_DEPTH
         bodies = @defs[name]?
@@ -149,6 +153,15 @@ module Catalyst
         bodies.each do |body|
           collect_sites(body.body, sites, path + [name], scope_bounded) if body.body
         end
+      end
+
+      # # A call is only followable when its receiver is absent or `self`:
+      # # `helper` and `self.helper` both land on a `def` in this file, while
+      # # `SomeShard.helper` cannot be inspected.
+      private def local_receiver?(obj : Crystal::ASTNode?) : Bool
+        return true if obj.nil?
+        return false unless obj.is_a?(Crystal::Var)
+        obj.name == "self"
       end
 
       # # True when `node` opens a scope that bounds everything inside it:
