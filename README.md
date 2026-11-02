@@ -103,6 +103,17 @@ call, so it is opt-in rather than built in.
 
 All 44 rules are documented in the [Wiki](https://github.com/unurgunite/catalyst/wiki). Numbers are not contiguous: CAT-019, 024, 036, 040, 044, 046, 047 and 048 were removed, and their numbers stay retired so an old `ignore` entry still means what it did.
 
+Two rules are off by default, because their advice cannot be told apart
+from correct code by looking at the source:
+
+| Rule | Why it is off | Turn it on with |
+|------|---------------|-----------------|
+| CAT-014 | Whether a file is read whole or streamed depends on its size, which is not in the code. On 3166 third-party files all 49 findings were `File.read` on a config, a test fixture, or a method returning `String`. | `--rules CAT-014` |
+| CAT-016 | Union type capacity hints depend on how the program is deployed. | `rules: {CAT-016: {enabled: true}}` |
+
+Either form works for both; `--rules` re-enables a rule for one run, a
+config entry for good.
+
 Quick reference:
 ```bash
 catalyst --list-rules
