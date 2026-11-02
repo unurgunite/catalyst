@@ -4,12 +4,13 @@ module Catalyst
   module Formatters
     # # Colorized human-readable output to STDOUT.
     class Terminal < Formatter
-      # # ANSI color codes per severity level.
+      # # ANSI color codes per severity level. The list is `Colorize::COLORS`;
+      # # `:dark_gray` is Crystal's dim grey (there is no `:dim`/`:light_black`).
       SEVERITY_COLORS = {
         "error"   => :red,
         "warning" => :yellow,
         "info"    => :cyan,
-        "hint"    => :dim,
+        "hint"    => :dark_gray,
       }
 
       # # Write findings as colorized lines with severity, location, and suggestion.
@@ -30,12 +31,6 @@ module Catalyst
         by_severity = filtered.group_by(&.severity)
         parts = by_severity.map { |severity, list| "#{list.size} #{severity}" }
         io.puts "Found #{filtered.size} issue#{filtered.size == 1 ? "" : "s"} (#{parts.join(", ")})"
-      end
-
-      private def filter_by_severity(results : Array(Result), min_severity : String) : Array(Result)
-        levels = %w[error warning info hint]
-        min_idx = levels.index(min_severity) || 0
-        results.select { |result| (levels.index(result.severity) || 0) >= min_idx }
       end
     end
   end

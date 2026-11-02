@@ -15,14 +15,15 @@ module Catalyst
     # # add allocations) and for small array literals outside loops, where the
     # # conversion cost exceeds any lookup gain.
     class ArrayIncludeToSet < Rule
+      include LoopTracking
       # # Array literals below this size are not worth converting outside loops.
       SMALL_LITERAL_LIMIT = 8
 
-      # # Block methods that imply repeated execution of their body.
-      LOOP_BLOCK_METHODS = {
-        "each", "each_with_index", "each_with_object",
-        "times", "upto", "downto", "step", "loop",
-      }
+      @small_literal_limit = SMALL_LITERAL_LIMIT
+
+      def configure(params : Hash(String, YAML::Any)) : Nil
+        @small_literal_limit = int_param(params, "limit", SMALL_LITERAL_LIMIT)
+      end
 
       @loop_depth : Int32 = 0
       # # Local variable names assigned from array literals (name -> size).
@@ -41,7 +42,7 @@ module Catalyst
       end
 
       def setup(file_path : String, source : String) : Nil
-        @loop_depth = 0
+        super
         @array_sizes.clear
       end
 
@@ -73,7 +74,7 @@ module Catalyst
         # O(1) lookup, numbers, String substring search, ...) is out too.
         size = array_receiver_size(unwrapped)
         return [] of Result if size.nil?
-        return [] of Result if size < SMALL_LITERAL_LIMIT && @loop_depth == 0
+        return [] of Result if size < @small_literal_limit && @loop_depth == 0
 
         line = node.location.try(&.line_number) || 0
         col = node.name_location.try(&.column_number) || 0
@@ -144,26 +145,6 @@ module Catalyst
           @array_sizes[name] = size
         else
           @array_sizes.delete(name)
-        end
-      end
-
-      private def track_enter(node : Crystal::ASTNode) : Nil
-        @loop_depth += 1 if loop_opener?(node)
-      end
-
-      private def track_leave(node : Crystal::ASTNode) : Nil
-        @loop_depth -= 1 if loop_opener?(node)
-      end
-
-      private def loop_opener?(node : Crystal::ASTNode) : Bool
-        case node
-        when Crystal::While, Crystal::Until
-          true
-        when Crystal::Block
-          call = node.call
-          call.is_a?(Crystal::Call) && LOOP_BLOCK_METHODS.includes?(call.name)
-        else
-          false
         end
       end
 

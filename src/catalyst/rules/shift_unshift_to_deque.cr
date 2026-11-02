@@ -9,13 +9,7 @@ module Catalyst
     # Outside loops (e.g. consuming a 2-3 element CLI argument list) the
     # rewrite only complicates the code, so the rule stays silent there.
     class ShiftUnshiftToDeque < Rule
-      # # Block methods that imply repeated execution of their body.
-      LOOP_BLOCK_METHODS = {
-        "each", "each_with_index", "each_with_object",
-        "times", "upto", "downto", "step", "loop",
-      }
-
-      @loop_depth : Int32 = 0
+      include LoopTracking
 
       def id : String
         "CAT-005"
@@ -30,7 +24,7 @@ module Catalyst
       end
 
       def setup(file_path : String, source : String) : Nil
-        @loop_depth = 0
+        super
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
@@ -62,26 +56,6 @@ module Catalyst
           suggestion: "Replace `Array` with `Deque` for efficient `#{node.name}`",
           confidence: "medium",
         )]
-      end
-
-      private def track_enter(node : Crystal::ASTNode) : Nil
-        @loop_depth += 1 if loop_opener?(node)
-      end
-
-      private def track_leave(node : Crystal::ASTNode) : Nil
-        @loop_depth -= 1 if loop_opener?(node)
-      end
-
-      private def loop_opener?(node : Crystal::ASTNode) : Bool
-        case node
-        when Crystal::While, Crystal::Until
-          true
-        when Crystal::Block
-          call = node.call
-          call.is_a?(Crystal::Call) && LOOP_BLOCK_METHODS.includes?(call.name)
-        else
-          false
-        end
       end
 
       Rule.all << self.new

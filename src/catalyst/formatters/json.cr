@@ -6,12 +6,7 @@ module Catalyst
     class Json < Formatter
       # # Write findings as a JSON array to IO.
       def output(results : Array(Result), io : IO, min_severity : String) : Nil
-        filtered = results.select { |result| severity_level(result.severity) >= severity_level(min_severity) }
-        io.puts filtered.to_json
-      end
-
-      private def severity_level(severity : String) : Int32
-        %w[error warning info hint].index(severity) || 0
+        io.puts filter_by_severity(results, min_severity).to_json
       end
     end
 
@@ -21,7 +16,7 @@ module Catalyst
     class Sarif < Formatter
       # # Write findings as a SARIF document to IO.
       def output(results : Array(Result), io : IO, min_severity : String) : Nil
-        filtered = results.select { |result| severity_level(result.severity) >= severity_level(min_severity) }
+        filtered = filter_by_severity(results, min_severity)
         sarif = generate_sarif(filtered)
         io.puts sarif.to_json
       end
@@ -60,10 +55,6 @@ module Catalyst
             },
           ],
         }
-      end
-
-      private def severity_level(severity : String) : Int32
-        %w[error warning info hint].index(severity) || 0
       end
     end
   end

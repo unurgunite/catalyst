@@ -12,6 +12,14 @@ private def sample_result(rule_id : String = "CAT-001") : Catalyst::Result
 end
 
 describe Catalyst::Baseline do
+  it "raises a readable error on a corrupt baseline" do
+    temp_dir do |dir|
+      path = write(dir, "bad.json", "{")
+      ex = expect_raises(Catalyst::ConfigError) { Catalyst::Baseline.load(path) }
+      ex.message.to_s.should contain("not valid JSON")
+    end
+  end
+
   it "builds keys without line numbers" do
     Catalyst::Baseline.key(sample_result).should eq("sample.cr:CAT-001:Use `min`/`max`")
   end

@@ -3,6 +3,12 @@ module Catalyst
     class LargeUnionTypes < Rule
       THRESHOLD = 4
 
+      @threshold = THRESHOLD
+
+      def configure(params : Hash(String, YAML::Any)) : Nil
+        @threshold = int_param(params, "threshold", THRESHOLD)
+      end
+
       def id : String
         "CAT-016"
       end
@@ -12,7 +18,7 @@ module Catalyst
       end
 
       def description : String
-        "Large union types (#{THRESHOLD}+ non-Nil types) — consider refactoring"
+        "Large union types (#{@threshold}+ non-Nil types) — consider refactoring"
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
@@ -22,7 +28,7 @@ module Catalyst
         # not a refactoring smell. Only explicit annotations are visible —
         # unannotated defs are out of reach without type inference.
         total = non_nil_member_count(rt)
-        return [] of Result unless total >= THRESHOLD
+        return [] of Result unless total >= @threshold
 
         line = node.location.try(&.line_number) || 0
         col = node.name_location.try(&.column_number) || 0
@@ -30,7 +36,7 @@ module Catalyst
         [Result.new(
           rule_id: id,
           severity: severity,
-          message: "Method `#{node.name}` returns a union of #{total} non-Nil types (#{THRESHOLD}+) — consider refactoring",
+          message: "Method `#{node.name}` returns a union of #{total} non-Nil types (#{@threshold}+) — consider refactoring",
           file: context.file,
           line: line,
           column: col,

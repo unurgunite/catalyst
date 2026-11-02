@@ -1,6 +1,7 @@
 module Catalyst
   module Rules
     class FileReadToStreaming < Rule
+      include LoopTracking
       FILE_METHODS = {"read", "read_lines"}
 
       # # `X.from_yaml(File.read(path))` reads a config by construction —
@@ -30,18 +31,13 @@ module Catalyst
         false
       end
 
-      # # Block methods that imply repeated execution of their body.
-      LOOP_BLOCK_METHODS = {
-        "each", "each_with_index", "each_with_object",
-        "times", "upto", "downto", "step", "loop",
-      }
-
       def initialize
         @config_parse_reads = Set(UInt64).new
         @loop_depth = 0
       end
 
       def setup(file_path : String, source : String) : Nil
+        super
         @config_parse_reads.clear
         @loop_depth = 0
       end
@@ -100,26 +96,6 @@ module Catalyst
           suggestion: "Replace `File.#{call.name}` with `File.open` for streaming",
           confidence: confidence,
         )]
-      end
-
-      private def track_enter(node : Crystal::ASTNode) : Nil
-        @loop_depth += 1 if loop_opener?(node)
-      end
-
-      private def track_leave(node : Crystal::ASTNode) : Nil
-        @loop_depth -= 1 if loop_opener?(node)
-      end
-
-      private def loop_opener?(node : Crystal::ASTNode) : Bool
-        case node
-        when Crystal::While, Crystal::Until
-          true
-        when Crystal::Block
-          call = node.call
-          call.is_a?(Crystal::Call) && LOOP_BLOCK_METHODS.includes?(call.name)
-        else
-          false
-        end
       end
 
       private def file_read_call(node : Crystal::ASTNode) : Crystal::Call?

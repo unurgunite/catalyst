@@ -5,7 +5,7 @@ module Catalyst
     # String concatenation in loops creates a new string on each iteration,
     # leading to O(n²) allocations. `String.build` accumulates in a reusable buffer.
     class StringPlusToStringBuild < Rule
-      @in_loop : Bool = false
+      include LoopTracking
 
       def id : String
         "CAT-010"
@@ -20,33 +20,19 @@ module Catalyst
       end
 
       def setup(file_path : String, source : String) : Nil
-        @in_loop = false
+        super
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
-        if loop_start?(node)
-          @in_loop = true
-          return [] of Result
-        end
-
-        return [] of Result unless @in_loop
+        track_enter(node)
+        return [] of Result unless in_loop?
 
         result = check_string_plus(node, context)
         result || [] of Result
       end
 
       def end_visit(node : Crystal::ASTNode) : Nil
-        if loop_start?(node)
-          @in_loop = false
-        end
-      end
-
-      # Returns true if node is a loop construct (Call with block, While, Until).
-      private def loop_start?(node : Crystal::ASTNode) : Bool
-        if node.is_a?(Crystal::Call)
-          return node.block != nil
-        end
-        node.is_a?(Crystal::While) || node.is_a?(Crystal::Until)
+        track_leave(node)
       end
 
       # Check a single node for string concatenation patterns.

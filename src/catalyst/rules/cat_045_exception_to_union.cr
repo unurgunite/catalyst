@@ -16,6 +16,12 @@ module Catalyst
         "info"
       end
 
+      # # Heuristic and noisy: opt-in only (`--rules #{rid}` or config
+      # # `rules: {#{rid}: {enabled: true}}`).
+      def enabled_by_default? : Bool
+        false
+      end
+
       def description : String
         "Raise Exception for expected failure, consider returning Union(T, Nil)"
       end
