@@ -34,8 +34,7 @@ module Catalyst
         line = call.location.try(&.line_number) || 0
         col = call.name_location.try(&.column_number) || 0
         line_text = context.line_text(line)
-        fix = line_text.sub(/\.(?:select|filter)(\s*\{.*\})\s*\.(?:first|first\?)/) { ".#{replacement}#{$1}" }
-        fix = nil if fix == line_text
+        fix = find_fix(line_text, replacement)
 
         [Result.new(
           rule_id: id,
@@ -48,6 +47,17 @@ module Catalyst
           confidence: "high",
           fix_replacement: fix,
         )]
+      end
+
+      # # Rewrites the call on `line` to `find`/`find!`. Two passes because
+      # # the trailing `?` belongs to the call being replaced: a single
+      # # pattern that matched `first?` as `.first` left the `?` behind and
+      # # produced `find { ... }?`, which does not parse. `.*?` keeps the
+      # # block body from swallowing an enclosing block's closing brace.
+      private def find_fix(line : String, replacement : String) : String?
+        once = line.sub(/\.(?:select|filter)(\s*\{.*?\})\s*\.first\?/) { ".#{replacement}#{$1}" }
+        once = line.sub(/\.(?:select|filter)(\s*\{.*?\})\s*\.first/) { ".#{replacement}#{$1}" } if once == line
+        once == line ? nil : once
       end
 
       # # If node is `select{}.first` / `{}.first?`, return the outer call node.

@@ -55,6 +55,31 @@ module Catalyst
         end
       end
 
+      describe "#fix_replacement" do
+        # The `?` belongs to the replaced call. A pattern that consumed
+        # `first` inside `first?` left the `?` behind, producing
+        # `find { ... }?`, which does not parse.
+        it "replaces first? with find and drops the question mark" do
+          fix_for(rule, "x = collect { arr.select { |y| y > 2 }.first? }").should eq(
+            "x = collect { arr.find { |y| y > 2 } }"
+          )
+        end
+
+        it "replaces first with find!" do
+          fix_for(rule, "x = collect { arr.select { |y| y > 2 }.first }").should eq(
+            "x = collect { arr.find! { |y| y > 2 } }"
+          )
+        end
+
+        # A greedy body matched past the inner block and swallowed the
+        # enclosing block's brace.
+        it "stops at the inner block's closing brace" do
+          fix_for(rule, "arr.select { |x| x > n / 2 }.first").should eq(
+            "arr.find! { |x| x > n / 2 }"
+          )
+        end
+      end
+
       describe "#id" do
         it "returns CAT-008" do
           rule.id.should eq("CAT-008")

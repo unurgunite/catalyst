@@ -205,6 +205,24 @@ describe Catalyst::Runner do
       end
     end
 
+    # --dry-run on its own used to do nothing at all: the fix pass was only
+    # reached when --fix was also passed, so "show me what you would change"
+    # printed the findings and said nothing about fixes.
+    it "reports what it would change when --dry-run is used without --fix" do
+      temp_dir do |dir|
+        original = "arr = [3, 1, 2]\nputs arr.sort.first\n"
+        path = write(dir, "e.cr", original)
+        options = Catalyst::Options.new
+        options.dry_run = true
+        io = IO::Memory.new
+        Catalyst::Runner.new(full_config, options, io).run([path])
+
+        io.to_s.should contain("would fix")
+        File.read(path).should eq(original)
+        File.exists?("#{path}.bak").should be_false
+      end
+    end
+
     it "never overwrites an existing backup" do
       temp_dir do |dir|
         path = write(dir, "d.cr", "class Foo\n  Regex.new(\"user-id\")\nend\n")

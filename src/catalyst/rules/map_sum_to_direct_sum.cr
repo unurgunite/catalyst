@@ -35,9 +35,10 @@ module Catalyst
         line = call.location.try(&.line_number) || 0
         col = call.name_location.try(&.column_number) || 0
         line_text = context.line_text(line)
-        fix = line_text.sub(/\.map(\s*\{.*\})\s*\.sum/) { ".sum#{$1}" }
-        fix = fix.sub(/\.map(\s*\(&[^)]+\))\s*\.sum/) { ".sum#{$1}" }
-        fix = nil if fix == line_text
+        # An initial value such as `.sum(0_i64)` sits after the block once the
+        # map is folded in, giving `sum { ... }(0_i64)`, which does not parse.
+        # Moving it inside needs the block's text, so only fix the plain form.
+        fix = call.args.empty? ? sum_fix(line_text) : nil
 
         [Result.new(
           rule_id: id,
@@ -50,6 +51,14 @@ module Catalyst
           confidence: "high",
           fix_replacement: fix,
         )]
+      end
+
+      # # Folds `.map{...}.sum` into `.sum{...}`. `.*?` keeps the body from
+      # # swallowing an enclosing block's closing brace.
+      private def sum_fix(line : String) : String?
+        once = line.sub(/\.map(\s*\{.*?\})\s*\.sum/) { ".sum#{$1}" }
+        once = line.sub(/\.map(\s*\(&[^)]+\))\s*\.sum/) { ".sum#{$1}" } if once == line
+        once == line ? nil : once
       end
 
       # # If node is `map{}.sum` or `map{}.sum(initial)`, return the outer call node.
