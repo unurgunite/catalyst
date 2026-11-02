@@ -20,20 +20,27 @@ module Catalyst
       def initialize
         @select_calls = {} of String => Crystal::Call
         @reject_calls = {} of String => Crystal::Call
+        @scope = [] of String
       end
 
       def setup(file_path : String, source : String) : Nil
         @select_calls.clear
         @reject_calls.clear
+        @scope.clear
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
+        # Track which method a call sits in. Two calls in different methods
+        # are not a select/reject pair, even when the receiver is spelled the
+        # same — `results.reject` in one helper and `results.select` in
+        # another read identically as `obj.to_s`.
+        enter_scope(node)
         return [] of Result unless node.is_a?(Crystal::Call)
         return [] of Result unless node.name == "select" || node.name == "reject"
         return [] of Result unless node.block
         return [] of Result unless obj = node.obj
 
-        key = obj.to_s
+        key = "#{@scope.join('/')}\u0000#{obj}"
 
         if node.name == "select"
           if @reject_calls.has_key?(key)
@@ -53,6 +60,15 @@ module Catalyst
         end
 
         [] of Result
+      end
+
+      private def enter_scope(node : Crystal::ASTNode) : Nil
+        @scope << node.name if node.is_a?(Crystal::Def)
+      end
+
+      def end_visit(node : Crystal::ASTNode) : Nil
+        # Pop only our own push: the root `Expressions` never reaches `check`.
+        @scope.pop if node.is_a?(Crystal::Def) && !@scope.empty?
       end
 
       private def partition_result(call : Crystal::Call, key : String, context : Context) : Array(Result)

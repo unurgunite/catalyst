@@ -44,6 +44,13 @@ module Catalyst
         return [] of Result unless (obj = node.obj).is_a?(Crystal::Path)
         return [] of Result unless obj.names == ["Regex"]
 
+        # A dynamic pattern cannot become a constant — there is no single
+        # value to hoist, and the suggestion would be inapplicable. Seen on
+        # catalyst's own `sub_code`, where the pattern is a parameter.
+        first_arg = node.args.first?
+        return [] of Result unless first_arg.is_a?(Crystal::StringLiteral) ||
+                                   first_arg.is_a?(Crystal::RegexLiteral)
+
         line = node.location.try(&.line_number) || 0
         source_line = context.line_text(line)
         return [] of Result if source_line =~ /^\s*[A-Z]\w*\s*=/
