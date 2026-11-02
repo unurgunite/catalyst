@@ -56,12 +56,11 @@ module Catalyst
           assert_no_finding(rule, %q(HTTP::Client.get("http://x")))
         end
 
-        # A hardcoded list of 16 "worker wrapper" method names used to live
-        # here and made the rule follow those defs into `spawn`. It was
-        # removed: the names came from one codebase, and on real projects
-        # every finding it produced was a false positive. The rule now only
-        # reports primitives it can see lexically inside `spawn`.
-        it "does not follow a call to a method defined elsewhere" do
+        # Reachability replaces the old hardcoded list of 16 wrapper names.
+        # The list came from one codebase: it reported methods unrelated to
+        # blocking and ignored every method not on it. Following local `def`
+        # bodies has neither failure mode.
+        it "follows a call into a method defined in the same file" do
           code = <<-CRYSTAL
             def check_config(url : String) : String?
               Process.new("worker", args: ["run"])
@@ -70,7 +69,129 @@ module Catalyst
               check_config("x")
             end
             CRYSTAL
+          assert_finding(rule, code, 1)
+        end
+
+        it "follows a method defined after the spawn that calls it" do
+          code = <<-CRYSTAL
+            spawn do
+              check_config("x")
+            end
+
+            def check_config(url : String) : String?
+              Process.new("worker", args: ["run"])
+            end
+            CRYSTAL
+          assert_finding(rule, code, 1)
+        end
+
+        it "follows a chain of local methods" do
+          code = <<-CRYSTAL
+            def first
+              second
+            end
+
+            def second
+              sleep 5
+            end
+
+            spawn do
+              first
+            end
+            CRYSTAL
+          assert_finding(rule, code, 1)
+        end
+
+        it "does not loop forever on a recursive method" do
+          code = <<-CRYSTAL
+            def walk(n : Int32)
+              walk(n - 1)
+            end
+
+            spawn do
+              walk(3)
+            end
+            CRYSTAL
           assert_no_finding(rule, code)
+        end
+
+        # A call into a shard cannot be inspected, and guessing is what made
+        # the old name list wrong.
+        it "does not follow a call into a method it cannot see" do
+          code = <<-CRYSTAL
+            spawn do
+              SomeShard.check_config("x")
+            end
+            CRYSTAL
+          assert_no_finding(rule, code)
+        end
+
+        it "does not report a local method that only sleeps zero" do
+          code = <<-CRYSTAL
+            def yield_thread
+              sleep 0
+            end
+
+            spawn do
+              yield_thread
+            end
+            CRYSTAL
+          assert_no_finding(rule, code)
+        end
+
+        # `spawn` + `select ... timeout` is the idiomatic way to bound a
+        # worker: the timeout sits next to the spawn, not inside it. A rule
+        # that only looks inside the block reports a bound call.
+        it "ignores a spawn bounded by a sibling select with a timeout" do
+          code = <<-CRYSTAL
+            done = Channel(Process::Status).new(1)
+            spawn do
+              done.send(Process.run("cmd"))
+            end
+            select
+            when status = done.receive
+              status
+            when timeout(5.seconds)
+              raise "timed out"
+            end
+            CRYSTAL
+          assert_no_finding(rule, code)
+        end
+
+        it "still reports a spawn whose select has no timeout branch" do
+          code = <<-CRYSTAL
+            done = Channel(Process::Status).new(1)
+            spawn do
+              done.send(Process.run("cmd"))
+            end
+            select
+            when status = done.receive
+              status
+            end
+            CRYSTAL
+          assert_finding(rule, code, 1)
+        end
+
+        it "ignores a sleep bounded by a fixed-iteration loop" do
+          code = <<-CRYSTAL
+            spawn do
+              3.times do
+                sleep 2.seconds
+              end
+            end
+            CRYSTAL
+          assert_no_finding(rule, code)
+        end
+
+        it "reports a sleep in an unbounded loop" do
+          code = <<-CRYSTAL
+            spawn do
+              loop do
+                sleep 2
+              end
+            end
+            CRYSTAL
+          assert_finding(rule, code, 1)
         end
 
         # The advice is "add a timeout"; asking for one that is already
