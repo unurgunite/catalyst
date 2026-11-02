@@ -93,6 +93,12 @@ paths:
   - src/
 ```
 
+`lib/**` keeps vendored shards out of the report: on real projects they
+accounted for the large majority of findings, and none of them are yours to
+fix. `**/*_spec.cr` does the same for test files — a spec that opens a
+socket on purpose is usually not a leak — though that one is a judgment
+call, so it is opt-in rather than built in.
+
 ## Rules
 
 All 52 rules (CAT-001–CAT-052) are documented in the [Wiki](https://github.com/unurgunite/catalyst/wiki).

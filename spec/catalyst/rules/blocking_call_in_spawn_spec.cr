@@ -56,49 +56,50 @@ module Catalyst
           assert_no_finding(rule, %q(HTTP::Client.get("http://x")))
         end
 
-        it "detects worker wrapper calls inside spawn" do
-          assert_finding(rule, "spawn { check_config(url, ip, port) }")
-        end
-
-        it "detects blocking primitives inside defs called from spawn" do
+        # A hardcoded list of 16 "worker wrapper" method names used to live
+        # here and made the rule follow those defs into `spawn`. It was
+        # removed: the names came from one codebase, and on real projects
+        # every finding it produced was a false positive. The rule now only
+        # reports primitives it can see lexically inside `spawn`.
+        it "does not follow a call to a method defined elsewhere" do
           code = <<-CRYSTAL
             def check_config(url : String) : String?
-              worker = Process.new("worker", args: ["run"])
-              sleep 1.8
-            end
-            spawn do
-              check_config("x")
-            end
-            CRYSTAL
-          results = run_rule(rule, code)
-          # wrapper call + Process.new + sleep
-          results.size.should eq(3)
-        end
-
-        it "resolves forward references (spawn before def)" do
-          code = <<-CRYSTAL
-            spawn do
-              check_config("x")
-            end
-            def check_config(url : String) : String?
-              worker = Process.new("worker", args: ["run"])
-            end
-            CRYSTAL
-          results = run_rule(rule, code)
-          results.size.should eq(2)
-        end
-
-        it "follows lambda .call chains (handle_failover)" do
-          code = <<-CRYSTAL
-            handle_failover = ->(trigger : String) do
               Process.new("worker", args: ["run"])
             end
             spawn do
-              handle_failover.call("sig")
+              check_config("x")
             end
             CRYSTAL
-          results = run_rule(rule, code)
-          results.size.should eq(2)
+          assert_no_finding(rule, code)
+        end
+
+        # The advice is "add a timeout"; asking for one that is already
+        # passed was the most common false positive on real code.
+        it "ignores a subprocess that already passes a timeout flag" do
+          code = <<-CRYSTAL
+            spawn do
+              Process.run("curl", args: ["-s", "--max-time", "15", url])
+            end
+            CRYSTAL
+          assert_no_finding(rule, code)
+        end
+
+        it "ignores an HTTP call with an explicit timeout" do
+          code = <<-CRYSTAL
+            spawn do
+              HTTP::Client.get(url, timeout: 5.seconds)
+            end
+            CRYSTAL
+          assert_no_finding(rule, code)
+        end
+
+        it "still reports a subprocess with no timeout at all" do
+          code = <<-CRYSTAL
+            spawn do
+              Process.run("curl", args: ["-s", url])
+            end
+            CRYSTAL
+          assert_finding(rule, code)
         end
 
         it "does not flag sequential top-level code" do
