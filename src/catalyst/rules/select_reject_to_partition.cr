@@ -40,26 +40,27 @@ module Catalyst
         return [] of Result unless node.block
         return [] of Result unless obj = node.obj
 
-        key = "#{@scope.join('/')}\u0000#{obj}"
+        pair(node, "#{@scope.join('/')}\u0000#{obj}", context)
+      end
 
+      # # Record the call, or report the pair once both sides are seen.
+      ##
+      # # The report always sits at the `select` call, whichever of the two
+      # # came first — that is the position the rule has always used.
+      private def pair(node : Crystal::Call, key : String, context : Context) : Array(Result)
         if node.name == "select"
-          if @reject_calls.has_key?(key)
-            @reject_calls.delete(key)
-            return partition_result(node, key, context)
-          else
+          unless @reject_calls.delete(key)
             @select_calls[key] = node
+            return [] of Result
           end
+          partition_result(node, key, context)
         else
-          if @select_calls.has_key?(key)
-            select_call = @select_calls[key]
-            @select_calls.delete(key)
-            return partition_result(select_call, key, context)
-          else
+          unless select_call = @select_calls.delete(key)
             @reject_calls[key] = node
+            return [] of Result
           end
+          partition_result(select_call, key, context)
         end
-
-        [] of Result
       end
 
       private def enter_scope(node : Crystal::ASTNode) : Nil

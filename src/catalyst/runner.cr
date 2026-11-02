@@ -25,45 +25,61 @@ module Catalyst
       sources = {} of String => Array(String)
 
       files.each do |file|
-        source = File.read(file)
-        sources[file] = source.lines
-        context = Context.new(file, source)
-
-        @rules.each(&.setup(file, source))
-
-        parser = Crystal::Parser.new(source)
-        nodes = parser.parse
-
-        visitor = Visitors::FileVisitor.new(@rules, context)
-        nodes.accept(visitor)
-
-        results.concat(visitor.results)
-      rescue ex : Crystal::SyntaxException
-        @errors += 1
-        @io.puts "catalyst: parse error in #{file}: #{ex.message}"
-      rescue ex : File::Error | IO::Error
-        @errors += 1
-        @io.puts "catalyst: cannot read #{file}: #{ex.message}"
+        findings = analyze_file(file, sources)
+        results.concat(findings) if findings
       end
 
+      finish(results, sources)
+    end
+
+    # # Analyze one file and record its lines for inline suppression.
+    ##
+    # # Returns nil when the file could not be read or parsed; the error is
+    # # already counted and reported.
+    private def analyze_file(file : String, sources : Hash(String, Array(String))) : Array(Result)?
+      source = File.read(file)
+      sources[file] = source.lines
+      parse_file(file, source)
+    rescue ex : Crystal::SyntaxException
+      report_error("parse error in #{file}", ex.message)
+    rescue ex : File::Error | IO::Error
+      report_error("cannot read #{file}", ex.message)
+    end
+
+    private def parse_file(file : String, source : String) : Array(Result)
+      @rules.each(&.setup(file, source))
+      context = Context.new(file, source)
+      visitor = Visitors::FileVisitor.new(@rules, context)
+      Crystal::Parser.new(source).parse.accept(visitor)
+      visitor.results
+    end
+
+    # # A file that could not be analyzed makes the result set incomplete.
+    private def report_error(what : String, message : String?) : Nil
+      @errors += 1
+      @io.puts "catalyst: #{what}: #{message}"
+    end
+
+    # # Apply the post-analysis pipeline: severity, suppression, baseline, fixes.
+    private def finish(results : Array(Result), sources : Hash(String, Array(String))) : Array(Result)
       apply_severity_overrides(results)
       results = suppress_inline(results, sources)
+      results = apply_baseline(results)
+      apply_fixes(results) if @options.fix? || @options.dry_run?
+      results
+    end
 
+    # # Write the baseline when asked, then keep only findings not in it.
+    private def apply_baseline(results : Array(Result)) : Array(Result)
       if update_path = @options.update_baseline
         count = Baseline.write(update_path, results)
         @io.puts "catalyst: wrote #{count} findings to #{update_path}"
       end
 
-      if baseline_path = (@options.update_baseline || @options.baseline)
-        known = Baseline.load(baseline_path)
-        results = Baseline.new_findings(results, known)
-      end
+      baseline_path = @options.update_baseline || @options.baseline
+      return results unless baseline_path
 
-      if @options.fix? || @options.dry_run?
-        apply_fixes(results)
-      end
-
-      results
+      Baseline.new_findings(results, Baseline.load(baseline_path))
     end
 
     # # Drop findings silenced by `# catalyst:disable` comments placed
@@ -94,9 +110,7 @@ module Catalyst
         return
       end
 
-      fixable.group_by(&.file).each do |file, file_results|
-        fix_file(file, file_results)
-      end
+      fixable.group_by(&.file).each { |file, file_results| fix_file(file, file_results) }
     end
 
     private def fix_file(file : String, file_results : Array(Result)) : Nil
@@ -105,19 +119,17 @@ module Catalyst
 
       if updated == source
         @io.puts "catalyst: no changes for #{file}"
-        return
-      end
-
-      if problem = parse_problem(updated)
+      elsif problem = parse_problem(updated)
         @io.puts "catalyst: skipped unsafe fix in #{file} — result would not parse: #{problem}"
-        return
-      end
-
-      if @options.dry_run?
+      elsif @options.dry_run?
         @io.puts "catalyst: would fix #{file}"
-        return
+      else
+        write_fix(file, updated)
       end
+    end
 
+    # # Write the rewritten file, keeping an existing backup untouched.
+    private def write_fix(file : String, updated : String) : Nil
       backup = "#{file}.bak"
       if File.exists?(backup)
         @io.puts "catalyst: backup #{backup} already exists — left untouched"
@@ -132,19 +144,10 @@ module Catalyst
     # Applies each replacement to its line and returns the new source.
     private def rewrite(source : String, file : String, file_results : Array(Result)) : String
       lines = source.lines
-
-      # One line may host several findings. Applying
-      # the whole line twice would drop the second fix, so only the first
-      # replacement per line is applied and the rest are reported as skipped.
       applied_lines = Set(Int32).new
+
       file_results.sort_by { |result| -result.line }.each do |result|
-        next if result.line < 1 || result.line > lines.size
-        next unless replacement = result.fix_replacement
-        unless applied_lines.add?(result.line)
-          @io.puts "catalyst: skipped #{result.rule_id} at #{file}:#{result.line} — same line already fixed"
-          next
-        end
-        lines[result.line - 1] = replacement
+        apply_replacement(lines, file, result, applied_lines)
       end
 
       # `String#lines` drops the trailing newline; writing the join back
@@ -152,6 +155,24 @@ module Catalyst
       updated = lines.join("\n")
       updated += "\n" if source.ends_with?('\n')
       updated
+    end
+
+    # # Replace one line, reporting why a replacement was not applied.
+    ##
+    # # One line may host several findings. Applying the whole line twice
+    # # would drop the second fix, so only the first replacement per line is
+    # # applied and the rest are reported as skipped.
+    private def apply_replacement(lines : Array(String), file : String,
+                                  result : Result, applied_lines : Set(Int32)) : Nil
+      return if result.line < 1 || result.line > lines.size
+      return unless replacement = result.fix_replacement
+
+      unless applied_lines.add?(result.line)
+        @io.puts "catalyst: skipped #{result.rule_id} at #{file}:#{result.line} — same line already fixed"
+        return
+      end
+
+      lines[result.line - 1] = replacement
     end
 
     # Returns a parse error message, or nil when `source` parses cleanly.
@@ -164,34 +185,34 @@ module Catalyst
 
     private def collect_files(paths : Array(String)) : Array(String)
       files = [] of String
-      paths.each do |path|
-        # Forward slashes: Dir.glob treats backslashes as escapes, so
-        # Windows paths must be normalized before globbing.
-        normalized = path.gsub("\\", "/")
-        if File.directory?(normalized)
-          # NOTE: no File.join — it would reintroduce a backslash
-          # separator on Windows and break the glob again.
-          Dir.glob("#{normalized}/**/*.cr").each { |file| files << file }
-        elsif File.file?(normalized) && normalized.ends_with?(".cr")
-          files << normalized
-        else
-          # A typo'd path would otherwise shrink the file list silently and
-          # produce a clean exit 0 on code that was never analyzed.
-          @io.puts "catalyst: no such file or directory: #{path}"
-          @errors += 1
-        end
-      end
-      # De-dupe by file identity, not by string spelling: the same file can
-      # arrive as `C:\dir\a.cr` (File.join), `C:/dir/a.cr` (normalized) or
-      # with different casing, and a directory plus a file inside it yields
-      # two entries anyway. Comparing spellings let the file be analyzed —
-      # and fixed — twice on Windows. `File.same?` answers for the platform.
+      paths.each { |path| expand_path(path, files) }
       files = dedupe(files)
-      files.reject! do |file|
-        @config.ignore.any? { |pattern| File.match?(pattern.gsub("\\", "/"), file) }
-      end
+      files.reject! { |file| ignored?(file) }
       files.sort!
       files
+    end
+
+    # # Add every `.cr` file under one path argument to `files`.
+    ##
+    # # Forward slashes only: `Dir.glob` treats backslashes as escapes, so
+    # # Windows paths must be normalized first. No `File.join` either — it
+    # # would reintroduce a backslash separator on Windows.
+    private def expand_path(path : String, files : Array(String)) : Nil
+      normalized = path.gsub("\\", "/")
+      if File.directory?(normalized)
+        Dir.glob("#{normalized}/**/*.cr").each { |file| files << file }
+      elsif File.file?(normalized) && normalized.ends_with?(".cr")
+        files << normalized
+      else
+        # A typo'd path would otherwise shrink the file list silently and
+        # produce a clean exit 0 on code that was never analyzed.
+        @io.puts "catalyst: no such file or directory: #{path}"
+        @errors += 1
+      end
+    end
+
+    private def ignored?(file : String) : Bool
+      @config.ignore.any? { |pattern| File.match?(pattern.gsub("\\", "/"), file) }
     end
 
     # # Build the active rule list from defaults, CLI allow/deny lists and
@@ -225,26 +246,37 @@ module Catalyst
 
     private def load_rules : Array(Rule)
       rules = Rule.all.select(&.enabled_by_default?)
+      rules = apply_allowlist(rules)
+      rules = apply_denylist(rules)
+      rules = apply_config_rules(rules)
+      configure_rules(rules)
+      rules
+    end
 
-      if allowlist = @options.rules
-        wanted = allowlist.map(&.strip).reject(&.empty?).to_set
-        # Compare against every registered rule, not just default-on ones,
-        # otherwise `--rules CAT-038` warns "unknown" and then yields nothing.
-        known = Rule.all.map(&.id).to_set
-        (wanted - known).each do |id|
-          @io.puts "catalyst: warning: unknown rule #{id} in --rules"
-        end
-        rules = Rule.all.select { |rule| wanted.includes?(rule.id) }
+    # # `--rules` replaces the default set with exactly the named rules.
+    private def apply_allowlist(rules : Array(Rule)) : Array(Rule)
+      return rules unless allowlist = @options.rules
+
+      wanted = allowlist.map(&.strip).reject(&.empty?).to_set
+      # Compare against every registered rule, not just default-on ones,
+      # otherwise `--rules CAT-038` warns "unknown" and then yields nothing.
+      (wanted - Rule.all.map(&.id).to_set).each do |id|
+        @io.puts "catalyst: warning: unknown rule #{id} in --rules"
       end
+      Rule.all.select { |rule| wanted.includes?(rule.id) }
+    end
 
-      if denylist = @options.ignore
-        denied = denylist.map(&.strip).reject(&.empty?).to_set
-        rules.reject! { |rule| denied.includes?(rule.id) }
-      end
+    private def apply_denylist(rules : Array(Rule)) : Array(Rule)
+      return rules unless denylist = @options.ignore
 
+      denied = denylist.map(&.strip).reject(&.empty?).to_set
+      rules.reject { |rule| denied.includes?(rule.id) }
+    end
+
+    # # A config entry can switch a rule off or re-add an opt-in rule.
+    private def apply_config_rules(rules : Array(Rule)) : Array(Rule)
       @config.rules.each do |id, rule_config|
         if rule_config.enabled?
-          # Re-add an opt-in rule the config asks for.
           if rule = Rule.all.find { |candidate| candidate.id == id }
             rules << rule unless rules.any? { |active| active.id == id }
           end
@@ -252,22 +284,18 @@ module Catalyst
           rules.reject! { |rule| rule.id == id }
         end
       end
+      rules
+    end
 
+    private def configure_rules(rules : Array(Rule)) : Nil
       rules.each do |rule|
         params = @config.rules[rule.id]?.try(&.params)
         rule.configure(params) if params
       end
-
-      rules
     end
 
     private def apply_severity_overrides(results : Array(Result)) : Nil
-      overrides = {} of String => String
-      @config.rules.each do |id, rule_config|
-        if severity = rule_config.severity
-          overrides[id] = severity
-        end
-      end
+      overrides = severity_overrides
       return if overrides.empty?
 
       # NOTE: Result is a struct, so mutate the copy and store it back —
@@ -278,6 +306,16 @@ module Catalyst
         end
         result
       end
+    end
+
+    private def severity_overrides : Hash(String, String)
+      overrides = {} of String => String
+      @config.rules.each do |id, rule_config|
+        if severity = rule_config.severity
+          overrides[id] = severity
+        end
+      end
+      overrides
     end
   end
 end

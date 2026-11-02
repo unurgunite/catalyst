@@ -4,3 +4,7 @@ shards:
     git: https://github.com/crystal-ameba/ameba.git
     version: 1.7.0
 
+  ameba-method_length:
+    git: https://github.com/unurgunite/ameba-method_length.git
+    version: 0.1.0
+

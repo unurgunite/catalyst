@@ -49,50 +49,51 @@ module Catalyst
     # # Raises `ConfigError` with a human-readable message on bad input.
     def self.load(path : String = ".catalyst.yml") : Config
       return default unless File.exists?(path)
-
-      begin
-        config = from_yaml(File.read(path))
-      rescue ex : ConfigError
-        raise ex
-      rescue ex : YAML::ParseException
-        raise ConfigError.new(
-          "config error in #{path}: #{ex.message} — " \
-          "expected mappings like `rules: {CAT-001: {enabled: false}}`"
-        )
-      rescue ex : File::Error | IO::Error
-        # Permissions, path-is-a-directory, or the file vanishing between the
-        # existence check and the read.
-        raise ConfigError.new("config error in #{path}: #{ex.message}")
-      end
-
+      config = parse_file(path)
       config.validate!(path)
       config
     end
 
+    # # Read and parse one config file. Raises `ConfigError` on bad input.
+    private def self.parse_file(path : String) : Config
+      from_yaml(File.read(path))
+    rescue ex : ConfigError
+      raise ex
+    rescue ex : YAML::ParseException
+      raise ConfigError.new(
+        "config error in #{path}: #{ex.message} — " \
+        "expected mappings like `rules: {CAT-001: {enabled: false}}`"
+      )
+    rescue ex : File::Error | IO::Error
+      # Permissions, path-is-a-directory, or the file vanishing between the
+      # existence check and the read.
+      raise ConfigError.new("config error in #{path}: #{ex.message}")
+    end
+
     # # Check enum fields and rule IDs. Raises `ConfigError` on bad values.
     def validate!(path : String) : Nil
-      unless SEVERITIES.includes?(severity)
-        raise ConfigError.new(
-          "config error in #{path}: severity #{severity.inspect} is not one of #{SEVERITIES.join("|")}"
-        )
-      end
-      unless FORMATS.includes?(format.downcase)
-        raise ConfigError.new(
-          "config error in #{path}: format #{format.inspect} is not one of #{FORMATS.join("|")}"
-        )
-      end
+      validate_enum(path, "severity", severity, SEVERITIES)
+      validate_enum(path, "format", format.downcase, FORMATS)
+      rules.each { |rule_id, rule_config| validate_rule(path, rule_id, rule_config) }
+    end
 
-      rules.each do |rule_id, rule_config|
-        # A typo here silently disabling a rule is worse than a loud failure.
-        unless known_rule_id?(rule_id)
-          raise ConfigError.new("config error in #{path}: unknown rule #{rule_id.inspect} in `rules`")
-        end
-        if (rule_severity = rule_config.severity) && !SEVERITIES.includes?(rule_severity)
-          raise ConfigError.new(
-            "config error in #{path}: severity #{rule_severity.inspect} for #{rule_id} is not one of #{SEVERITIES.join("|")}"
-          )
-        end
+    # # Reject a value that is not one of the documented levels.
+    private def validate_enum(path : String, field : String, value : String, allowed : Array(String)) : Nil
+      return if allowed.includes?(value)
+
+      raise ConfigError.new(
+        "config error in #{path}: #{field} #{value.inspect} is not one of #{allowed.join("|")}"
+      )
+    end
+
+    private def validate_rule(path : String, rule_id : String, rule_config : RuleConfig) : Nil
+      # A typo here silently disabling a rule is worse than a loud failure.
+      unless known_rule_id?(rule_id)
+        raise ConfigError.new("config error in #{path}: unknown rule #{rule_id.inspect} in `rules`")
       end
+      return unless rule_severity = rule_config.severity
+
+      validate_enum(path, "severity for #{rule_id}", rule_severity, SEVERITIES)
     end
 
     # Rules are registered at require time, so the registry is authoritative.
