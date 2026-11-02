@@ -1,6 +1,7 @@
 module Catalyst
   module Rules
     class FileReadToStreaming < Rule
+      include LoopTracking
       FILE_METHODS = {"read", "read_lines"}
 
       # # `X.from_yaml(File.read(path))` reads a config by construction —
@@ -26,15 +27,18 @@ module Catalyst
         "Use streaming instead of reading entire file at once"
       end
 
-      def auto_fixable? : Bool
+      # # Whether a file is read whole or streamed cannot be decided from its
+      # # source: the size is not in the code, and most whole-file reads are
+      # # configs and fixtures where `File.read` is the right call. On 3166
+      # # third-party files every finding was of that kind — tests reading
+      # # fixtures, and methods returning `String` where streaming cannot fit.
+      def enabled_by_default? : Bool
         false
       end
 
-      # # Block methods that imply repeated execution of their body.
-      LOOP_BLOCK_METHODS = {
-        "each", "each_with_index", "each_with_object",
-        "times", "upto", "downto", "step", "loop",
-      }
+      def auto_fixable? : Bool
+        false
+      end
 
       def initialize
         @config_parse_reads = Set(UInt64).new
@@ -42,6 +46,7 @@ module Catalyst
       end
 
       def setup(file_path : String, source : String) : Nil
+        super
         @config_parse_reads.clear
         @loop_depth = 0
       end
@@ -100,26 +105,6 @@ module Catalyst
           suggestion: "Replace `File.#{call.name}` with `File.open` for streaming",
           confidence: confidence,
         )]
-      end
-
-      private def track_enter(node : Crystal::ASTNode) : Nil
-        @loop_depth += 1 if loop_opener?(node)
-      end
-
-      private def track_leave(node : Crystal::ASTNode) : Nil
-        @loop_depth -= 1 if loop_opener?(node)
-      end
-
-      private def loop_opener?(node : Crystal::ASTNode) : Bool
-        case node
-        when Crystal::While, Crystal::Until
-          true
-        when Crystal::Block
-          call = node.call
-          call.is_a?(Crystal::Call) && LOOP_BLOCK_METHODS.includes?(call.name)
-        else
-          false
-        end
       end
 
       private def file_read_call(node : Crystal::ASTNode) : Crystal::Call?

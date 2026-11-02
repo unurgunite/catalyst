@@ -19,17 +19,23 @@ module Catalyst
 
       def initialize
         @ancestors = [] of Crystal::ASTNode
+        @string_vars = Set(String).new
       end
 
       def setup(file_path : String, source : String) : Nil
         @ancestors.clear
+        @string_vars.clear
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         parent = @ancestors.last?
         @ancestors << node
+        track_assign(node)
         call = match_call(node)
         return [] of Result unless call
+        # `matches?` only exists on String. A custom object or a LibPCRE2
+        # binding with a `match` method would not compile after the swap.
+        return [] of Result unless string_receiver?(call.obj)
         return [] of Result unless boolean_parent?(parent)
 
         line = call.location.try(&.line_number) || 0
@@ -88,6 +94,30 @@ module Catalyst
           true
         else
           false
+        end
+      end
+
+      # True when the receiver is recognisably a String.
+      private def string_receiver?(obj : Crystal::ASTNode?) : Bool
+        case obj
+        when Crystal::StringLiteral, Crystal::StringInterpolation
+          true
+        when Crystal::Var
+          @string_vars.includes?(obj.name)
+        else
+          false
+        end
+      end
+
+      private def track_assign(node : Crystal::ASTNode) : Nil
+        return unless node.is_a?(Crystal::Assign)
+        target = node.target
+        return unless target.is_a?(Crystal::Var)
+        value = node.value
+        if value.is_a?(Crystal::StringLiteral) || value.is_a?(Crystal::StringInterpolation)
+          @string_vars << target.name
+        elsif !value.is_a?(Crystal::Call)
+          @string_vars.delete(target.name)
         end
       end
 

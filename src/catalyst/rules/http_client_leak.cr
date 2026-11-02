@@ -1,6 +1,7 @@
 module Catalyst
   module Rules
-    class HttpClientLeak < Rule
+    # # CAT-028: HTTP::Client resource leak — use block form or ensure `close` is called
+    class HttpClientLeak < ResourceLeakRule
       def id : String
         "CAT-028"
       end
@@ -10,35 +11,23 @@ module Catalyst
       end
 
       def description : String
-        "HTTP::Client resource leak — use block form or ensure close"
+        "HTTP::Client resource leak — use block form or ensure `close` is called"
       end
 
-      def check(node : Crystal::ASTNode, context : Context) : Array(Result)
-        call = http_client_new_call(node)
-        return [] of Result unless call
-
-        line = call.location.try(&.line_number) || 0
-        col = call.name_location.try(&.column_number) || 0
-
-        [Result.new(
-          rule_id: id,
-          severity: severity,
-          message: "HTTP::Client resource leak — use block form or ensure `close` is called",
-          file: context.file,
-          line: line,
-          column: col,
-          suggestion: "Use block form: `HTTP::Client.new(url) { |c| ... }` or ensure `client.close`",
-          confidence: "high"
-        )]
+      def acquire_method : String
+        "new"
       end
 
-      private def http_client_new_call(node : Crystal::ASTNode) : Crystal::Call?
-        return nil unless node.is_a?(Crystal::Call)
-        return nil unless node.name == "new"
-        return nil unless (obj = node.obj).is_a?(Crystal::Path)
-        return nil unless obj.names == %w[HTTP Client]
-        return nil unless node.block.nil?
-        node
+      def resource_type : String
+        "HTTP::Client"
+      end
+
+      def message : String
+        "HTTP::Client resource leak — use block form or ensure `close` is called"
+      end
+
+      def suggestion : String
+        "Use block form: `HTTP::Client.new(url) { |c| ... }` or ensure `client.close`"
       end
 
       Rule.all << self.new

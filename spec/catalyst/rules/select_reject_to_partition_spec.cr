@@ -34,6 +34,42 @@ module Catalyst
           results = run_rule(SelectRejectToPartition.new, "arr.select { |x| x > 5 }\narr.reject { |x| x > 5 }")
           results.size.should eq(1)
         end
+
+        # The receiver is compared by its source text, so `results.reject` in
+        # one method and `results.select` in another read as the same
+        # receiver. That produced a false positive on catalyst's own
+        # runner.cr, where a `reject` helper and an unrelated `select` both
+        # name `results`.
+        it "does not pair calls that sit in different methods" do
+          code = <<-CRYSTAL
+            class Jobs
+              def suppress(results, sources)
+                results.reject do |result|
+                  lines = sources[result.file]? || [] of String
+                  lines.empty?
+                end
+              end
+
+              def apply_fixes(results)
+                fixable = results.select(&.fix_replacement)
+                fixable.size
+              end
+            end
+            CRYSTAL
+          assert_no_finding(SelectRejectToPartition.new, code)
+        end
+
+        it "still pairs calls in one method" do
+          code = <<-CRYSTAL
+            class Jobs
+              def split(results)
+                results.reject { |r| r.odd? }
+                results.select(&.wanted?)
+              end
+            end
+            CRYSTAL
+          assert_finding(SelectRejectToPartition.new, code)
+        end
       end
 
       describe "#id" do

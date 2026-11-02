@@ -22,6 +22,18 @@ module Catalyst
           assert_no_finding(rule, %("foo".gsub("a", "b")))
         end
 
+        # A hash `gsub` replaces all matches in one pass, so merging these
+        # would turn "XX" into "%X". The rule must stay quiet.
+        it "ignores a chain where one replacement feeds a later pattern" do
+          assert_no_finding(rule, %("foo".gsub('a', "%").gsub('%', "X")))
+        end
+
+        # The common percent-escape chain: `%` is replaced first, so a
+        # `\r` turned into "%0D" is not re-escaped to "%250D".
+        it "ignores a chain of independent escape steps" do
+          assert_no_finding(rule, %("foo".gsub('%', "%25").gsub('\r', "%0D")))
+        end
+
         it "ignores gsub with hash argument" do
           assert_no_finding(rule, %("foo".gsub({"a" => "b", "c" => "d"})))
         end

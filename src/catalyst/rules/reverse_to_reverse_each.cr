@@ -28,8 +28,7 @@ module Catalyst
 
         line = call.location.try(&.line_number) || 0
         col = call.name_location.try(&.column_number) || 0
-        line_text = context.line_text(line)
-        fix = line_text.gsub(".reverse.each", ".reverse_each")
+        fix = sub_code(context.line_text(line), ".reverse.each", ".reverse_each")
 
         [Result.new(
           rule_id: id,

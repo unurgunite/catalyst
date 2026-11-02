@@ -13,6 +13,8 @@ jobs:
           - os: ubuntu-latest
             crystal: "1.21.0"
           - os: ubuntu-latest
+            crystal: "1.22.0"
+          - os: ubuntu-latest
             crystal: latest
           - os: macos-latest
             crystal: latest
@@ -63,3 +65,48 @@ jobs:
           test "$(bin/catalyst --version)" = "catalyst v$(grep '^version:' shard.yml | awk '{print $2}')"
           bin/catalyst --help
           bin/catalyst --list-rules
+
+  # Applying a fix is a source rewrite. The spec suite checks that a rewrite is
+  # emitted, not that the emitted code builds — the old CAT-019 fix produced an
+  # undefined constant that parsed fine. Compile the output here.
+  fixed-code-compiles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: "1.22.0"
+
+      - name: Install dependencies
+        run: shards install
+
+      - name: Build
+        run: crystal build src/catalyst.cr --release -o bin/catalyst
+
+      - name: Compile the result of every fix
+        run: crystal run scripts/check_fix_compiles.cr -- --run
+
+  # bench/ holds 45 directories nobody runs otherwise, so a broken one stays
+  # broken silently. They are not timed here, only compiled.
+  benches-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: "1.22.0"
+
+      - name: Compile every benchmark
+        run: |
+          status=0
+          for file in bench/cat-*/*.cr; do
+            if ! crystal build --no-codegen "$file"; then
+              echo "::error file=$file::benchmark does not compile"
+              status=1
+            fi
+          done
+          exit $status

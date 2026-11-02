@@ -33,10 +33,26 @@ module Catalyst
         true
       end
 
+      # # Variables assigned a Hash in this file. `each_key` exists on Hash
+      # # only: a `NamedTupleLiteral` inside a macro (`.keys` there is a macro
+      # # method) has no such thing, and real-world fixes turned working code
+      # # into `undefined macro method 'NamedTupleLiteral#each_key'`.
+      @hash_vars = Set(String).new
+
+      def setup(file_path : String, source : String) : Nil
+        @hash_vars.clear
+        super
+      end
+
       # # Check if node is `hash.keys.each`.
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
+        track_assign(node)
+
         call = keys_each_call(node)
         return [] of Result unless call
+
+        keys = call.obj.as(Crystal::Call)
+        return [] of Result unless hash_receiver?(keys.obj)
 
         line = call.location.try(&.line_number) || 0
         col = call.name_location.try(&.column_number) || 0
@@ -54,7 +70,7 @@ module Catalyst
           )]
         else
           line_text = context.line_text(line)
-          fix = line_text.gsub(".keys.each", ".each_key")
+          fix = sub_code(line_text, ".keys.each", ".each_key")
 
           [Result.new(
             rule_id: id,
@@ -67,6 +83,59 @@ module Catalyst
             confidence: "high",
             fix_replacement: fix,
           )]
+        end
+      end
+
+      # # True when the receiver is recognisably a Hash.
+      private def hash_receiver?(obj : Crystal::ASTNode?) : Bool
+        case obj
+        when Crystal::HashLiteral
+          true
+        when Crystal::Var, Crystal::InstanceVar, Crystal::ClassVar
+          @hash_vars.includes?(obj.name)
+        else
+          hash_constructor?(obj)
+        end
+      end
+
+      private def hash_constructor?(obj : Crystal::ASTNode?) : Bool
+        return false unless obj.is_a?(Crystal::Call)
+        case obj.name
+        when "new"
+          generic_named?(obj.obj, "Hash")
+        when "of"
+          obj.obj.is_a?(Crystal::HashLiteral)
+        when "to_h", "group_by", "index_by"
+          # These build a Hash from an Enumerable; `.keys` is then Hash#keys.
+          true
+        else
+          false
+        end
+      end
+
+      # # `Hash` and `Hash(K, V)` are a Path and a Generic respectively.
+      private def generic_named?(obj : Crystal::ASTNode?, name : String) : Bool
+        case obj
+        when Crystal::Path
+          obj.names == [name]
+        when Crystal::Generic
+          path = obj.name
+          path.is_a?(Crystal::Path) && path.names == [name]
+        else
+          false
+        end
+      end
+
+      private def track_assign(node : Crystal::ASTNode) : Nil
+        return unless node.is_a?(Crystal::Assign)
+        target = node.target
+        return unless target.is_a?(Crystal::Var) || target.is_a?(Crystal::InstanceVar) || target.is_a?(Crystal::ClassVar)
+        value = node.value
+        name = target.name
+        if value.is_a?(Crystal::HashLiteral) || hash_constructor?(value)
+          @hash_vars << name
+        elsif !value.is_a?(Crystal::Call)
+          @hash_vars.delete(name)
         end
       end
 

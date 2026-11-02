@@ -36,8 +36,14 @@ catalyst --ci src/
 # JSON output
 catalyst --format json src/
 
+# Only show findings at or above a severity
+catalyst --severity error src/
+
 # Apply safe auto-fixes
 catalyst --fix src/
+
+# See what --fix would change, without writing
+catalyst --fix --dry-run src/
 
 # Enable only specific rules
 catalyst --rules CAT-001,CAT-002 src/
@@ -49,6 +55,23 @@ catalyst --baseline .catalyst-baseline.json --ci src/
 # List all rules
 catalyst --list-rules
 ```
+
+`--format` and `--severity` override the values from `.catalyst.yml`.
+
+Exit codes: `0` clean, `1` findings in `--ci` mode, `2` configuration or
+runtime error.
+
+### Auto-fix safety
+
+`--fix` never writes a file it cannot re-parse: every rewritten file is
+parsed before it is saved, and any fix whose result would not parse is
+skipped with a diagnostic on STDERR. A finding whose replacement equals the
+original line is treated as a no-op. The original file is copied to
+`<file>.bak` **before the first** fix and an existing `.bak` is never
+overwritten, so a re-run cannot clobber the only pre-fix copy — delete or
+move the `.bak` yourself once you have reviewed the change. Use `--dry-run`
+to preview. Diagnostics always go to STDERR, so `--format json` and
+`--format sarif` output stays machine-readable on STDOUT.
 
 ## Configuration
 
@@ -70,9 +93,26 @@ paths:
   - src/
 ```
 
+`lib/**` keeps vendored shards out of the report: on real projects they
+accounted for the large majority of findings, and none of them are yours to
+fix. `**/*_spec.cr` does the same for test files — a spec that opens a
+socket on purpose is usually not a leak — though that one is a judgment
+call, so it is opt-in rather than built in.
+
 ## Rules
 
-All 52 rules (CAT-001–CAT-052) are documented in the [Wiki](https://github.com/unurgunite/catalyst/wiki).
+All 44 rules are documented in the [Wiki](https://github.com/unurgunite/catalyst/wiki). Numbers are not contiguous: CAT-019, 024, 036, 040, 044, 046, 047 and 048 were removed, and their numbers stay retired so an old `ignore` entry still means what it did.
+
+Two rules are off by default, because their advice cannot be told apart
+from correct code by looking at the source:
+
+| Rule | Why it is off | Turn it on with |
+|------|---------------|-----------------|
+| CAT-014 | Whether a file is read whole or streamed depends on its size, which is not in the code. On 3166 third-party files all 49 findings were `File.read` on a config, a test fixture, or a method returning `String`. | `--rules CAT-014` |
+| CAT-016 | Union type capacity hints depend on how the program is deployed. | `rules: {CAT-016: {enabled: true}}` |
+
+Either form works for both; `--rules` re-enables a rule for one run, a
+config entry for good.
 
 Quick reference:
 ```bash
@@ -83,8 +123,19 @@ catalyst --list-rules
 
 ```bash
 crystal spec
-catalyst src/
-ameba src/
+crystal run bin/ameba.cr --
+crystal tool format --check
+```
+
+Two things the spec suite cannot check on its own:
+
+```bash
+# Apply every fix and compile the result. A fix can emit code that parses
+# but does not build, which no assertion in the suite would notice.
+crystal run scripts/check_fix_compiles.cr -- --run
+
+# Compile every benchmark under bench/. CI runs this on each push.
+for file in bench/cat-*/*.cr; do crystal build --no-codegen "$file"; done
 ```
 
 ## License

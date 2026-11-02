@@ -18,6 +18,13 @@ module Catalyst
           assert_finding(rule, "def foo\n  Regex.new(/x/)\nend")
         end
 
+        # There is no value to hoist when the pattern is computed, so the
+        # suggestion would be inapplicable. This is the shape in catalyst's
+        # own `sub_code`, where the pattern is a parameter.
+        it "ignores a dynamic pattern" do
+          assert_no_finding(rule, "def foo(p)\n  Regex.new(p)\nend")
+        end
+
         it "ignores Regex.new assigned to constant" do
           assert_no_finding(rule, "RE = Regex.new(/pattern/)")
         end
