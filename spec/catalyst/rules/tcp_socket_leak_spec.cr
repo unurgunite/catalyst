@@ -28,8 +28,11 @@ module Catalyst
           )
         end
 
-        it "detects TCPSocket.new inside method without ensure" do
-          assert_finding(rule, <<-CRYSTAL
+        # A socket closed before the method returns is not a leak. These two
+        # cases used to assert a finding, which is what made the rule report
+        # correct code on every real project it ran on.
+        it "stays silent when the method closes the socket" do
+          assert_no_finding(rule, <<-CRYSTAL
             def fetch
               s = TCPSocket.new("example.com", 80)
               s.gets
@@ -39,13 +42,24 @@ module Catalyst
           )
         end
 
-        it "detects TCPSocket.new inside method with ensure close" do
-          assert_finding(rule, <<-CRYSTAL
+        it "stays silent when the method closes the socket in ensure" do
+          assert_no_finding(rule, <<-CRYSTAL
             def fetch
               s = TCPSocket.new("example.com", 80)
               s.gets
             ensure
               s.close
+            end
+            CRYSTAL
+          )
+        end
+
+        it "detects a socket a method returns without closing" do
+          assert_finding(rule, <<-CRYSTAL
+            def fetch
+              s = TCPSocket.new("example.com", 80)
+              s.gets
+              s
             end
             CRYSTAL
           )

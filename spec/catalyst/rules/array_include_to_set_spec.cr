@@ -34,8 +34,12 @@ module Catalyst
           assert_no_finding(rule, "a = [1, 2]\na = Set{3}\na.includes?(3)")
         end
 
-        it "detects variable assigned from array literal" do
-          assert_finding(rule, "list = [1, 2, 3, 4, 5, 6, 7, 8, 9]\nlist.includes?(x)")
+        # A lookup performed once is not worth converting; the advice is
+        # "convert once before the loop", so there must be a loop. Reporting
+        # these was the most common false positive on real projects (ARGV
+        # flag parsing branches).
+        it "ignores a large array searched only once" do
+          assert_no_finding(rule, "list = [1, 2, 3, 4, 5, 6, 7, 8, 9]\nlist.includes?(x)")
         end
 
         it "ignores small array variable outside loops" do
@@ -67,8 +71,12 @@ module Catalyst
           assert_no_finding(rule, "%w[none warning info debug].includes?(level)")
         end
 
-        it "detects includes? with string arg on array variable" do
-          assert_finding(rule, "names = [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\", \"h\", \"i\"]\nnames.includes?(\"alice\")")
+        it "ignores a string array searched only once" do
+          assert_no_finding(rule, "names = [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\", \"h\", \"i\"]\nnames.includes?(\"alice\")")
+        end
+
+        it "detects a string array searched inside a loop" do
+          assert_finding(rule, "names = [\"a\", \"b\"]\nitems.each { |i| names.includes?(i) }")
         end
 
         it "detects array variable inside loop" do

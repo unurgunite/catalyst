@@ -71,5 +71,59 @@ describe Catalyst::Rules::ResourceLeakRule do
     it "ignores a differently named method on the same type" do
       leak_rule(Catalyst::Rules::FileOpenLeak.new, %q(File.size("x"))).should eq(0)
     end
+
+    # Reporting `new` followed by `close` on the next line was the largest
+    # source of false positives when these rules ran on real projects: a
+    # helper that opens a handle, closes it and returns a Bool is correct.
+    it "stays silent when the enclosing method closes the resource" do
+      code = <<-CRYSTAL
+        def tcp_alive?(host : String, port : Int32) : Bool
+          sock = TCPSocket.new(host, port)
+          sock.close
+          true
+        rescue
+          false
+        end
+        CRYSTAL
+      leak_rule(Catalyst::Rules::TcpSocketLeak.new, code).should eq(0)
+    end
+
+    it "stays silent when the resource is closed on exit" do
+      code = <<-CRYSTAL
+        def connect
+          d = ::DB.open("url")
+          at_exit { d.close }
+          d
+        end
+        CRYSTAL
+      leak_rule(Catalyst::Rules::DbOpenLeak.new, code).should eq(0)
+    end
+
+    # The closing scan must not swallow a genuine leak in the same file.
+    it "still reports a leak in a method that never closes it" do
+      code = <<-CRYSTAL
+        def connect
+          d = ::DB.open("url")
+          d
+        end
+        CRYSTAL
+      leak_rule(Catalyst::Rules::DbOpenLeak.new, code).should eq(1)
+    end
+
+    it "reports a leak in a method alongside a clean factory" do
+      code = <<-CRYSTAL
+        def alive? : Bool
+          sock = TCPSocket.new("h", 80)
+          sock.close
+          true
+        end
+
+        def leaky
+          sock = TCPSocket.new("h", 80)
+          sock
+        end
+        CRYSTAL
+      leak_rule(Catalyst::Rules::TcpSocketLeak.new, code).should eq(1)
+    end
   end
 end

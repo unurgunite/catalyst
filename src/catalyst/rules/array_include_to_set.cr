@@ -16,15 +16,6 @@ module Catalyst
     # # conversion cost exceeds any lookup gain.
     class ArrayIncludeToSet < Rule
       include LoopTracking
-      # # Array literals below this size are not worth converting outside loops.
-      SMALL_LITERAL_LIMIT = 8
-
-      @small_literal_limit = SMALL_LITERAL_LIMIT
-
-      def configure(params : Hash(String, YAML::Any)) : Nil
-        @small_literal_limit = int_param(params, "limit", SMALL_LITERAL_LIMIT)
-      end
-
       @loop_depth : Int32 = 0
       # # Local variable names assigned from array literals (name -> size).
       @array_sizes = {} of String => Int32
@@ -49,9 +40,11 @@ module Catalyst
       # # Check if node is an `includes?` call with exactly one argument.
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         track_assign(node)
-        results = check_includes(node, context)
+        # Depth must be accurate for this node, so the loop opener is counted
+        # before the check. Counting after left `includes?` inside a loop
+        # looking like top-level code.
         track_enter(node)
-        results
+        check_includes(node, context)
       end
 
       def end_visit(node : Crystal::ASTNode) : Nil
@@ -72,9 +65,12 @@ module Catalyst
         # silent — suggesting `Set` for something already O(1) (e.g. a
         # `Set`) is worse than noise. Every non-array literal (Range with
         # O(1) lookup, numbers, String substring search, ...) is out too.
-        size = array_receiver_size(unwrapped)
-        return [] of Result if size.nil?
-        return [] of Result if size < @small_literal_limit && @loop_depth == 0
+        return [] of Result if array_receiver_size(unwrapped).nil?
+        # The suggestion is "convert before the loop", so it is only true when
+        # there is one. Reporting a one-shot lookup is what made this rule
+        # noisy on real projects: an `ARGV`-parsing branch is searched once
+        # and building a `Set` there only adds an allocation.
+        return [] of Result if @loop_depth == 0
 
         line = node.location.try(&.line_number) || 0
         col = node.name_location.try(&.column_number) || 0
@@ -87,7 +83,7 @@ module Catalyst
           line: line,
           column: col,
           suggestion: "Convert the array to a `Set` before the loop: `ary.to_set`",
-          confidence: @loop_depth > 0 ? "medium" : "low",
+          confidence: "medium",
         )]
       end
 
