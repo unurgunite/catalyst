@@ -112,8 +112,19 @@ catalyst --list-rules
 
 ```bash
 crystal spec
-catalyst src/
-ameba src/
+crystal run bin/ameba.cr --
+crystal tool format --check
+```
+
+Two things the spec suite cannot check on its own:
+
+```bash
+# Apply every fix and compile the result. A fix can emit code that parses
+# but does not build, which no assertion in the suite would notice.
+crystal run scripts/check_fix_compiles.cr -- --run
+
+# Compile every benchmark under bench/. CI runs this on each push.
+for file in bench/cat-*/*.cr; do crystal build --no-codegen "$file"; done
 ```
 
 ## License
