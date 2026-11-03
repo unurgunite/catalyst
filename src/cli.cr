@@ -74,8 +74,13 @@ module Catalyst
     # # Run the analysis and turn the outcome into an exit code.
     private def self.analyze(config : Config, options : Options, args : Array(String)) : Int32
       runner = Runner.new(config, options)
-      results = run_analysis(runner, args)
-      return 2 unless results
+      found = run_analysis(runner, args)
+      return 2 unless found
+
+      # Filter once, here: the report and the exit code must agree on what
+      # counts as a finding. Filtering inside the formatters let `--ci` exit 1
+      # while printing nothing.
+      results = Formatter.filter_by_severity(found, config.severity)
       return 2 unless report(config, results)
 
       exit_code(results, options, runner.errors)
@@ -92,7 +97,7 @@ module Catalyst
 
     # # Write the report. Returns false when the formatter refuses the output.
     private def self.report(config : Config, results : Array(Result)) : Bool
-      Formatter.for(config.format).output(results, STDOUT, config.severity)
+      Formatter.for(config.format).output(results, STDOUT)
       true
     rescue ex : ArgumentError
       STDERR.puts "catalyst: #{ex.message}"
