@@ -26,31 +26,28 @@ module Catalyst
         call = map_sum_call(node)
         return [] of Result unless call
 
-        suggestion = if call.args.empty?
-                       "sum { ... }"
-                     else
-                       "sum(...) { ... }"
-                     end
-
-        line = call.location.try(&.line_number) || 0
-        col = call.name_location.try(&.column_number) || 0
-        line_text = context.line_text(line)
-        # An initial value such as `.sum(0_i64)` sits after the block once the
-        # map is folded in, giving `sum { ... }(0_i64)`, which does not parse.
-        # Moving it inside needs the block's text, so only fix the plain form.
-        fix = call.args.empty? ? sum_fix(line_text) : nil
-
+        suggestion = call.args.empty? ? "sum { ... }" : "sum(...) { ... }"
         [Result.new(
           rule_id: id,
           severity: severity,
           message: "Use `sum` with a block instead of `map` followed by `sum`",
           file: context.file,
-          line: line,
-          column: col,
+          line: call.location.try(&.line_number) || 0,
+          column: call.name_location.try(&.column_number) || 0,
           suggestion: "Replace `map{}.sum` with `#{suggestion}`",
           confidence: "high",
-          fix_replacement: fix,
+          fix_replacement: fix_for(call, context),
         )]
+      end
+
+      # # An initial value such as `.sum(0_i64)` lands *after* the block once
+      # # the map is folded in, giving `sum { ... }(0_i64)` which does not
+      # # parse. Moving it inside needs the block's text, so only the plain
+      # # form is fixed.
+      private def fix_for(call : Crystal::Call, context : Context) : String?
+        return nil unless call.args.empty?
+
+        sum_fix(context.line_text(call.location.try(&.line_number) || 0))
       end
 
       # # Folds `.map{...}.sum` into `.sum{...}`. `.*?` keeps the body from

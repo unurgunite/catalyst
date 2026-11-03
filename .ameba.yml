@@ -14,3 +14,20 @@ Globs:
   - "!lib"
   - "!bench/**/*.cr"
   - "!hello_enterprise/**/*.cr"
+
+# Methods no longer than 15 lines. Multi-line literals count as one line, so
+# the limit measures branching, not fixture size.
+Metrics/MethodLength:
+  Enabled: true
+  # Only body lines count (since ameba-method_length 0.1.1): `def`, `end`,
+  # blank lines and comment-only lines are excluded, matching RuboCop.
+  MaxLines: 15
+  CountAsOne:
+    - array
+    - hash
+    - heredoc
+  # The OptionParser block assigns into the caller's `options`/`config_path`
+  # locals; `Options` and `Config` are structs, so moving the flag
+  # registrations into helper methods silently mutates copies.
+  AllowedMethods:
+    - parse_options

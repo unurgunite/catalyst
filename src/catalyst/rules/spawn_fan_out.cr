@@ -78,25 +78,34 @@ module Catalyst
       # # `X = <int>` constant folding (same-file only). Any non-literal
       # # reassignment invalidates — config/CLI values stay unknown, never 0.
       private def track_assign(node : Crystal::ASTNode) : Nil
-        target, value = case node
-                        when Crystal::Assign
-                          {node.target, node.value}
-                        when Crystal::OpAssign
-                          {node.target, node.value}
-                        else
-                          return
-                        end
-        name = case target
-               when Crystal::Var, Crystal::InstanceVar, Crystal::ClassVar
-                 target.name
-               when Crystal::Path
-                 target.names.last? if target.names.size == 1
-               end
+        assignment = assignment_parts(node)
+        return unless assignment
+
+        target, value = assignment
+        name = assign_name(target)
         return unless name
+
         if (lit = value).is_a?(Crystal::NumberLiteral) && (n = lit.value.to_i?)
           @ints[name] = n
         else
           @ints.delete(name)
+        end
+      end
+
+      private def assignment_parts(node : Crystal::ASTNode) : {Crystal::ASTNode, Crystal::ASTNode}?
+        case node
+        when Crystal::Assign   then {node.target, node.value}
+        when Crystal::OpAssign then {node.target, node.value}
+        end
+      end
+
+      # # The name a constant-foldable assignment defines, if any.
+      private def assign_name(target : Crystal::ASTNode) : String?
+        case target
+        when Crystal::Var, Crystal::InstanceVar, Crystal::ClassVar
+          target.name
+        when Crystal::Path
+          target.names.size == 1 ? target.names.first : nil
         end
       end
 
@@ -253,23 +262,31 @@ module Catalyst
       end
 
       private def track_enter(node : Crystal::ASTNode) : Nil
-        if node.is_a?(Crystal::Block) && (call = node.call).is_a?(Crystal::Call)
-          if call.name == "times"
-            recv = call.obj
-            bound = case recv
-                    when Crystal::NumberLiteral
-                      {recv.value, recv.value.to_i?}
-                    when Crystal::Var
-                      {recv.name, fold_int(recv)}
-                    when Crystal::Path
-                      recv.names.size == 1 ? {recv.names.first, fold_int(recv)} : {"?", nil}
-                    else
-                      {"?", nil}
-                    end
-            @times_stack << bound
-          elsif call.name == "spawn"
-            @spawn_depth += 1
-          end
+        return unless node.is_a?(Crystal::Block)
+
+        call = node.call
+        return unless call.is_a?(Crystal::Call)
+
+        case call.name
+        when "times"
+          @times_stack << times_bound(call)
+        when "spawn"
+          @spawn_depth += 1
+        end
+      end
+
+      # # `<n>.times` bound as {label, amount}; the amount is nil when unknown.
+      private def times_bound(call : Crystal::Call) : {String, Int32?}
+        recv = call.obj
+        case recv
+        when Crystal::NumberLiteral
+          {recv.value, recv.value.to_i?}
+        when Crystal::Var
+          {recv.name, fold_int(recv)}
+        when Crystal::Path
+          recv.names.size == 1 ? {recv.names.first, fold_int(recv)} : {"?", nil}
+        else
+          {"?", nil}
         end
       end
 

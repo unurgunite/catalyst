@@ -39,33 +39,46 @@ module Catalyst
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         track_scope_start(node)
-        return [] of Result unless node.is_a?(Crystal::Call)
-        return [] of Result unless node.name == "new" || node.name == "compile"
-        return [] of Result unless (obj = node.obj).is_a?(Crystal::Path)
-        return [] of Result unless obj.names == ["Regex"]
+        call = regex_new_call(node)
+        return [] of Result unless call
 
-        # A dynamic pattern cannot become a constant — there is no single
-        # value to hoist, and the suggestion would be inapplicable. Seen on
-        # catalyst's own `sub_code`, where the pattern is a parameter.
-        first_arg = node.args.first?
-        return [] of Result unless first_arg.is_a?(Crystal::StringLiteral) ||
-                                   first_arg.is_a?(Crystal::RegexLiteral)
-
-        line = node.location.try(&.line_number) || 0
+        line = call.location.try(&.line_number) || 0
         source_line = context.line_text(line)
+        # An already-named constant needs no suggestion.
         return [] of Result if source_line =~ /^\s*[A-Z]\w*\s*=/
 
-        [Result.new(
+        [build_result(call, context, line, source_line)]
+      end
+
+      # # `Regex.new(...)` / `Regex.compile(...)` with a literal pattern.
+      ##
+      # # A dynamic pattern cannot become a constant — there is no single
+      # # value to hoist, and the suggestion would be inapplicable. Seen on
+      # # catalyst's own `sub_code`, where the pattern is a parameter.
+      private def regex_new_call(node : Crystal::ASTNode) : Crystal::Call?
+        return nil unless node.is_a?(Crystal::Call)
+        return nil unless node.name == "new" || node.name == "compile"
+        return nil unless (obj = node.obj).is_a?(Crystal::Path)
+        return nil unless obj.names == ["Regex"]
+
+        arg = node.args.first?
+        return nil unless arg.is_a?(Crystal::StringLiteral) || arg.is_a?(Crystal::RegexLiteral)
+
+        node
+      end
+
+      private def build_result(call : Crystal::Call, context : Context, line : Int32, source_line : String) : Result
+        Result.new(
           rule_id: id,
           severity: severity,
-          message: "Use class constant for `Regex.#{node.name}` instead of creating inside method",
+          message: "Use class constant for `Regex.#{call.name}` instead of creating inside method",
           file: context.file,
           line: line,
-          column: node.name_location.try(&.column_number) || 0,
-          suggestion: "Define `RE = Regex.#{node.name}(...)` as a constant and reuse",
+          column: call.name_location.try(&.column_number) || 0,
+          suggestion: "Define `RE = Regex.#{call.name}(...)` as a constant and reuse",
           confidence: "high",
-          fix_replacement: fix_replacement(source_line, node)
-        )]
+          fix_replacement: fix_replacement(source_line, call),
+        )
       end
 
       # # Rewrites `NAME = Regex.new(...)` in place, only for a call that is
@@ -84,11 +97,16 @@ module Catalyst
         # Only a line that holds nothing but the call is rewritten; the
         # original text is reused verbatim so escaping stays untouched.
         stripped = source_line.strip
-        return nil unless stripped.matches?(/\ARegex\.(new|compile)\(/)
-        return nil unless stripped.ends_with?(")")
+        return nil unless standalone_call?(stripped)
 
         indent = source_line[/^\s*/]? || ""
         "#{indent}#{name} = #{stripped}"
+      end
+
+      # # The call must be the whole statement — not embedded in an expression
+      # # or a local assignment, where hoisting would change what is bound.
+      private def standalone_call?(stripped : String) : Bool
+        stripped.matches?(/\ARegex\.(new|compile)\(/) && stripped.ends_with?(")")
       end
 
       private def const_name(pattern : String) : String

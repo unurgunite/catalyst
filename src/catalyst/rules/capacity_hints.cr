@@ -25,30 +25,39 @@ module Catalyst
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         return [] of Result unless node.is_a?(Crystal::Call)
-        return [] of Result unless node.name == "new"
-        return [] of Result unless node.args.empty?
+        collection = collection_new(node)
+        return [] of Result unless collection
+
+        [build_result(collection, node, context)]
+      end
+
+      # # The collection name in `Array(T).new` / `Hash(K, V).new`, else nil.
+      private def collection_new(node : Crystal::Call) : String?
+        return nil unless node.name == "new"
+        return nil unless node.args.empty?
 
         obj = node.obj
-        return [] of Result unless obj.is_a?(Crystal::Generic)
-        return [] of Result unless obj.name.is_a?(Crystal::Path)
+        return nil unless obj.is_a?(Crystal::Generic)
+        return nil unless (path = obj.name).is_a?(Crystal::Path)
 
-        names = obj.name.as(Crystal::Path).names
-        return [] of Result unless names.size == 1 && names.first.in?(COLLECTION_TYPES)
+        names = path.names
+        return nil unless names.size == 1
 
         collection = names.first
-        line = node.location.try(&.line_number) || 0
-        col = node.name_location.try(&.column_number) || 0
+        COLLECTION_TYPES.includes?(collection) ? collection : nil
+      end
 
-        [Result.new(
+      private def build_result(collection : String, call : Crystal::Call, context : Context) : Result
+        Result.new(
           rule_id: id,
           severity: severity,
           message: "Pre-size `#{collection}` with capacity hint via `.new(capacity)` when size is known",
           file: context.file,
-          line: line,
-          column: col,
+          line: call.location.try(&.line_number) || 0,
+          column: call.name_location.try(&.column_number) || 0,
           suggestion: "Use `#{collection}(Type).new(expected_size)` to avoid reallocations",
           confidence: "medium",
-        )]
+        )
       end
 
       Rule.all << self.new

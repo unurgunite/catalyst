@@ -42,38 +42,48 @@ module Catalyst
         type_name = PARSE_TYPES.find { |_, names| obj.names == names }
         return [] of Result unless type_name
 
-        line = node.location.try(&.line_number) || 0
-        col = node.name_location.try(&.column_number) || 0
-
         # Nothing to hoist when the call already runs once.
         return [] of Result if @loop_depth == 0
 
-        # Literal arguments are always hoistable — flag with confidence.
-        # Variable arguments can only be hoisted when the same value is
-        # parsed on every iteration (e.g. NOT `parse_vless(url)` called
-        # with a fresh URL), so they are low-confidence hints: a regex
-        # capture or a loop variable changes every iteration.
-        first = node.args.first?
-        if first.is_a?(Crystal::StringLiteral)
-          message = "Hoist `#{type_name[0]}.#{node.name}` out of loop to a constant"
-          suggestion = "Pre-parse the value into a constant outside the loop"
-          confidence = "high"
-        else
-          message = "Hoist `#{type_name[0]}.#{node.name}` out of loop to a constant if the same value is parsed on every iteration"
-          suggestion = "If the argument does not change between iterations, pre-parse it once outside the loop"
-          confidence = "low"
-        end
+        [build_result(node, context, type_name[0])]
+      end
 
-        [Result.new(
+      # # Literal arguments are always hoistable — flag with confidence.
+      # # Variable arguments can only be hoisted when the same value is
+      # # parsed on every iteration (e.g. NOT `parse_vless(url)` called with a
+      # # fresh URL), so they are low-confidence hints: a regex capture or a
+      # # loop variable changes every iteration.
+      private def build_result(node : Crystal::Call, context : Context, type_name : String) : Result
+        call = "#{type_name}.#{node.name}"
+        message, suggestion, confidence = advice(node, call)
+
+        Result.new(
           rule_id: id,
           severity: severity,
           message: message,
           file: context.file,
-          line: line,
-          column: col,
+          line: node.location.try(&.line_number) || 0,
+          column: node.name_location.try(&.column_number) || 0,
           suggestion: suggestion,
           confidence: confidence,
-        )]
+        )
+      end
+
+      # # Literal arguments are always hoistable — flag with confidence.
+      # # Variable arguments can only be hoisted when the same value is
+      # # parsed on every iteration (e.g. NOT `parse_vless(url)` called with a
+      # # fresh URL), so they are low-confidence hints: a regex capture or a
+      # # loop variable changes every iteration.
+      private def advice(node : Crystal::Call, call : String) : {String, String, String}
+        if node.args.first?.is_a?(Crystal::StringLiteral)
+          {"Hoist `#{call}` out of loop to a constant",
+           "Pre-parse the value into a constant outside the loop",
+           "high"}
+        else
+          {"Hoist `#{call}` out of loop to a constant if the same value is parsed on every iteration",
+           "If the argument does not change between iterations, pre-parse it once outside the loop",
+           "low"}
+        end
       end
 
       Rule.all << self.new

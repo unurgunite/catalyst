@@ -18,18 +18,21 @@ module Catalyst
         filtered = filter_by_severity(results, min_severity)
         return if filtered.empty?
 
-        filtered.each do |result|
-          color = SEVERITY_COLORS[result.severity]? || :default
-          io.puts "#{result.file}:#{result.line}:#{result.column} — #{result.rule_id}: #{result.message.colorize(color)}"
-          if result.suggestion
-            io.puts "  Suggestion: #{result.suggestion}"
-          end
-          io.puts "  [help: https://github.com/unurgunite/catalyst/wiki/#{result.rule_id}]"
-          io.puts
-        end
+        filtered.each { |result| write_result(io, result) }
+        write_summary(io, filtered)
+      end
 
-        by_severity = filtered.group_by(&.severity)
-        parts = by_severity.map { |severity, list| "#{list.size} #{severity}" }
+      # # One finding: location line, optional suggestion, help link, blank line.
+      private def write_result(io : IO, result : Result) : Nil
+        color = SEVERITY_COLORS[result.severity]? || :default
+        io.puts "#{result.file}:#{result.line}:#{result.column} — #{result.rule_id}: #{result.message.colorize(color)}"
+        io.puts "  Suggestion: #{result.suggestion}" if result.suggestion
+        io.puts "  [help: https://github.com/unurgunite/catalyst/wiki/#{result.rule_id}]"
+        io.puts
+      end
+
+      private def write_summary(io : IO, filtered : Array(Result)) : Nil
+        parts = filtered.group_by(&.severity).map { |severity, list| "#{list.size} #{severity}" }
         io.puts "Found #{filtered.size} issue#{filtered.size == 1 ? "" : "s"} (#{parts.join(", ")})"
       end
     end

@@ -52,39 +52,53 @@ module Catalyst
       end
 
       private def check_includes(node : Crystal::ASTNode, context : Context) : Array(Result)
-        return [] of Result unless node.is_a?(Crystal::Call)
-        return [] of Result unless node.name == "includes?"
-        return [] of Result unless node.args.size == 1
-        return [] of Result unless receiver = node.obj
+        call = array_include_call(node)
+        return [] of Result unless call
 
-        unwrapped = unwrap(receiver)
+        [build_result(call, context)]
+      end
 
-        # Only receivers proven to be arrays are flagged: array literals
-        # and variables assigned from array literals in this file.
-        # Unknown receivers (params, call results, plain variables) stay
-        # silent — suggesting `Set` for something already O(1) (e.g. a
-        # `Set`) is worse than noise. Every non-array literal (Range with
-        # O(1) lookup, numbers, String substring search, ...) is out too.
-        return [] of Result if array_receiver_size(unwrapped).nil?
-        # The suggestion is "convert before the loop", so it is only true when
-        # there is one. Reporting a one-shot lookup is what made this rule
-        # noisy on real projects: an `ARGV`-parsing branch is searched once
-        # and building a `Set` there only adds an allocation.
-        return [] of Result if @loop_depth == 0
+      # # `X.includes?(y)` where `X` is provably an array and we are in a loop.
+      ##
+      # # Only receivers proven to be arrays are flagged: array literals and
+      # # variables assigned from array literals in this file. Unknown
+      # # receivers (params, call results, plain variables) stay silent —
+      # # suggesting `Set` for something already O(1) (e.g. a `Set`) is worse
+      # # than noise. Every non-array literal (Range with O(1) lookup,
+      # # numbers, String substring search, ...) is out too.
+      ##
+      # # The suggestion is "convert before the loop", so it is only true
+      # # when there is one. Reporting a one-shot lookup is what made this
+      # # rule noisy on real projects: an `ARGV`-parsing branch is searched
+      # # once and building a `Set` there only adds an allocation.
+      private def array_include_call(node : Crystal::ASTNode) : Crystal::Call?
+        return nil unless node.is_a?(Crystal::Call)
+        return nil unless node.name == "includes?"
+        return nil unless node.args.size == 1
+        return nil unless array_receivers?(node)
 
-        line = node.location.try(&.line_number) || 0
-        col = node.name_location.try(&.column_number) || 0
+        node
+      end
 
-        [Result.new(
+      # # The receiver must be a provable array and the call must be in a loop.
+      private def array_receivers?(call : Crystal::Call) : Bool
+        receiver = call.obj
+        return false unless receiver && @loop_depth > 0
+
+        !array_receiver_size(unwrap(receiver)).nil?
+      end
+
+      private def build_result(call : Crystal::Call, context : Context) : Result
+        Result.new(
           rule_id: id,
           severity: severity,
           message: "Use `Set` instead of `Array#include?` in loops",
           file: context.file,
-          line: line,
-          column: col,
+          line: call.location.try(&.line_number) || 0,
+          column: call.name_location.try(&.column_number) || 0,
           suggestion: "Convert the array to a `Set` before the loop: `ary.to_set`",
           confidence: "medium",
-        )]
+        )
       end
 
       # # Array size if receiver is proven to be an array, else nil.
@@ -120,27 +134,40 @@ module Catalyst
       # # Remember variables assigned from array literals; forget variables
       # # assigned anything else (e.g. reassigned to a `Set`).
       private def track_assign(node : Crystal::ASTNode) : Nil
-        case node
-        when Crystal::Assign
-          target, value = node.target, node.value
-        when Crystal::OpAssign
-          target, value = node.target, node.value
-        else
-          return
-        end
+        assignment = assignment_parts(node)
+        return unless assignment
 
-        name = case target
-               when Crystal::Var, Crystal::InstanceVar, Crystal::ClassVar
-                 target.name
-               else
-                 return
-               end
+        target, value = assignment
+        name = assign_name(target)
+        return unless name
 
-        literal = unwrap(value)
-        if literal.is_a?(Crystal::ArrayLiteral) && (size = plain_array_size(literal))
+        size = array_literal_size(value)
+        if size
           @array_sizes[name] = size
         else
           @array_sizes.delete(name)
+        end
+      end
+
+      # # Target and value of an assignment, or nil for any other node.
+      private def assignment_parts(node : Crystal::ASTNode) : {Crystal::ASTNode, Crystal::ASTNode}?
+        case node
+        when Crystal::Assign   then {node.target, node.value}
+        when Crystal::OpAssign then {node.target, node.value}
+        end
+      end
+
+      # # Size when `value` is an array literal, else nil.
+      private def array_literal_size(value : Crystal::ASTNode) : Int32?
+        literal = unwrap(value)
+        literal.is_a?(Crystal::ArrayLiteral) ? plain_array_size(literal) : nil
+      end
+
+      # # The variable an assignment targets, or nil for slices and calls.
+      private def assign_name(target : Crystal::ASTNode) : String?
+        case target
+        when Crystal::Var, Crystal::InstanceVar, Crystal::ClassVar
+          target.name
         end
       end
 
