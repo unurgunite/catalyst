@@ -26,12 +26,12 @@ module Catalyst
       # # false positives when this rule was run on real projects.
       @source_lines = [] of String
       # # Line ranges of every method in the file, keyed by the line the
-      # # method starts on. See `MethodIndexer`.
-      @methods = {} of Int32 => Range(Int32, Int32)
+      # # method starts on. See `Catalyst::MethodIndex`.
+      @methods = {} of Int32 => MethodIndex::MethodInfo
 
       def setup(file_path : String, source : String) : Nil
         @source_lines = source.lines
-        @methods = index_methods(source)
+        @methods = MethodIndex.index_methods(source)
       end
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
@@ -112,12 +112,7 @@ module Catalyst
 
       # # Line of the `def` whose body contains `line`, or nil at top level.
       private def enclosing_def_line(line : Int32) : Int32?
-        best = nil
-        @methods.each do |start, span|
-          next unless line >= start && line <= span.end
-          best = start if best.nil? || start > best
-        end
-        best
+        MethodIndex.enclosing_def_line(@methods, line)
       end
 
       # # True for a blank line, `name.something = ...`, or a plain local
@@ -157,48 +152,12 @@ module Catalyst
 
       # # Line range of the method containing `line`, or nil at top level.
       private def enclosing_method(line : Int32) : Range(Int32, Int32)?
-        best = nil
-        @methods.each do |start, span|
-          next unless line >= start && line <= span.end
-          # Innermost wins when methods nest.
-          best = span if best.nil? || start > best.begin
-        end
-        best
-      end
-
-      # # Line range of every `def` in the file, as 1-based inclusive ranges
-      # # covering the body only.
-      private def index_methods(source : String) : Hash(Int32, Range(Int32, Int32))
-        ast = Crystal::Parser.parse(source)
-        indexer = MethodIndexer.new
-        ast.accept(indexer)
-        indexer.ranges
-      rescue Crystal::SyntaxException
-        {} of Int32 => Range(Int32, Int32)
+        MethodIndex.enclosing_method(@methods, line)
       end
 
       private def strip_comment(line : String) : String
         idx = line.index('#')
         idx ? line[0...idx] : line
-      end
-
-      # # Collects the body line range of every method, ignoring nesting.
-      private class MethodIndexer < Crystal::Visitor
-        getter ranges = {} of Int32 => Range(Int32, Int32)
-
-        def visit(node : Crystal::ASTNode)
-          true
-        end
-
-        def visit(node : Crystal::Def)
-          start_line = node.location.try(&.line_number)
-          end_line = node.end_location.try(&.line_number)
-          if start_line && end_line && end_line > start_line + 1
-            # 1-based, exclusive of both the `def` line and the closing `end`.
-            ranges[start_line] = (start_line + 1)..(end_line - 1)
-          end
-          true
-        end
       end
     end
   end
