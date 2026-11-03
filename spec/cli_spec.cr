@@ -64,7 +64,7 @@ describe Catalyst::CLI do
       temp_dir do |dir|
         config = write(dir, ".catalyst.yml", "severity: error\nformat: terminal\n")
         # CAT-041 is info, so an error-level gate has nothing to report.
-        source = write(dir, "a.cr", "def f(urls)\n  urls.each { |u| URI.parse(u) }\nend\n")
+        source = write(dir, "a.cr", "def f(urls)\n  urls.each { |u| URI.parse(\"https://example.com\") }\nend\n")
         Catalyst::CLI.run(["--config", config, "--ci", source]).should eq(0)
       end
     end
@@ -72,7 +72,7 @@ describe Catalyst::CLI do
     it "exits 1 when a finding meets the minimum severity" do
       temp_dir do |dir|
         config = write(dir, ".catalyst.yml", "severity: hint\nformat: terminal\n")
-        source = write(dir, "a.cr", "def f(urls)\n  urls.each { |u| URI.parse(u) }\nend\n")
+        source = write(dir, "a.cr", "def f(urls)\n  urls.each { |u| URI.parse(\"https://example.com\") }\nend\n")
         Catalyst::CLI.run(["--config", config, "--ci", source]).should eq(1)
       end
     end
