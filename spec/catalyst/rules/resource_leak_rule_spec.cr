@@ -131,10 +131,88 @@ end # A factory hands the handle back and the caller owns it. Closing it
 it "ignores an acquire call returned by the enclosing method" do
   code = <<-CRYSTAL
     module Net
-      def self.connect(host, port)
+      def self.connect(host, port) : TCPSocket
         TCPSocket.new(host, port)
       end
     end
     CRYSTAL
   leak_rule(Catalyst::Rules::TcpSocketLeak.new, code).should eq(0)
+end
+
+# Without a declared return type the intent is not explicit, so the handle
+# left on the last line keeps reporting.
+it "reports a handle returned by a method with no declared type" do
+  code = <<-CRYSTAL
+    module Net
+      def self.connect(host, port)
+        TCPSocket.new(host, port)
+      end
+    end
+    CRYSTAL
+  leak_rule(Catalyst::Rules::TcpSocketLeak.new, code).should eq(1)
+end
+
+# The method body used to be found by counting `def`/`do`/`end` in the source
+# text, which got three shapes wrong. Each of these reported code that closes
+# its handle; all three are pinned here.
+describe "method scope" do
+  it "sees a close that follows a nested block" do
+    # A `do` used to count as an opener, so the body ended at the block's
+    # `end` and the `close` below it fell outside the scan.
+    code = <<-CRYSTAL
+      def run
+        sock = TCPSocket.new("h", 80)
+        3.times do |i|
+          puts i
+        end
+        sock.close
+      end
+      CRYSTAL
+    leak_rule(Catalyst::Rules::TcpSocketLeak.new, code).should eq(0)
+  end
+
+  it "recognises private def" do
+    # `private def` was not matched, so the scan escaped into the neighbouring
+    # method and reported a helper that closes its own file.
+    code = <<-CRYSTAL
+      private def helper
+        file = File.open("x", "w")
+        file.close
+      end
+      CRYSTAL
+    leak_rule(Catalyst::Rules::FileOpenLeak.new, code).should eq(0)
+  end
+
+  it "reports a private def that really leaks" do
+    code = <<-CRYSTAL
+      private def helper
+        file = File.open("x", "w")
+        puts file
+      end
+      CRYSTAL
+    leak_rule(Catalyst::Rules::FileOpenLeak.new, code).should eq(1)
+  end
+
+  it "does not depend on method order in the file" do
+    # The reported line used to change when an unrelated method preceded the
+    # leaking one, because the body scan started from the wrong place.
+    first = <<-CRYSTAL
+      def leaks
+        sock = TCPSocket.new("h", 80)
+        sock.read
+      end
+      CRYSTAL
+    second = <<-CRYSTAL
+      def other
+        puts 1
+      end
+
+      def leaks
+        sock = TCPSocket.new("h", 80)
+        sock.read
+      end
+      CRYSTAL
+    leak_rule(Catalyst::Rules::TcpSocketLeak.new, first).should eq(1)
+    leak_rule(Catalyst::Rules::TcpSocketLeak.new, second).should eq(1)
+  end
 end
