@@ -96,21 +96,26 @@ module Catalyst
       chars = line.chars
       i = 0
       while i < chars.size
-        case chars[i]
-        when '#'
-          # A `#{` inside a string is consumed by the string branch below;
-          # reaching `#` here means the rest of the line is a comment.
-          (i...chars.size).each { |j| chars[j] = ' ' }
-          break
-        when '\''
-          i = mask_quoted(chars, i, '\'')
-        when '"'
-          i = mask_quoted(chars, i, '"')
-        else
-          i += 1
-        end
+        i = mask_at(chars, i)
       end
       chars.join
+    end
+
+    # Mask whatever starts at `i`, returning the index to continue from.
+    private def mask_at(chars : Array(Char), i : Int32) : Int32
+      case chars[i]
+      when '#'
+        # A `#{` inside a string is consumed by the string branch below;
+        # reaching `#` here means the rest of the line is a comment.
+        (i...chars.size).each { |j| chars[j] = ' ' }
+        chars.size
+      when '\''
+        mask_quoted(chars, i, '\'')
+      when '"'
+        mask_quoted(chars, i, '"')
+      else
+        i + 1
+      end
     end
 
     # Mask a single- or double-quoted literal starting at `start`, returning

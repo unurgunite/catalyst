@@ -25,14 +25,11 @@ module Catalyst
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         return [] of Result unless node.is_a?(Crystal::Call)
-        return [] of Result unless node.name == "gsub"
+        call = node
+        return [] of Result unless chain_of_gsubs?(call)
+        return [] of Result if counted_in_chain?(call)
 
-        receiver = node.obj
-        return [] of Result unless receiver.is_a?(Crystal::Call)
-        return [] of Result unless receiver.name == "gsub"
-        return [] of Result if counted_in_chain?(node)
-
-        chain = collect_chain(node)
+        chain = collect_chain(call)
         @counted.concat(chain)
 
         # A hash `gsub` replaces every match in one pass, so a chain whose
@@ -41,7 +38,19 @@ module Catalyst
         # form gives "%X". Only independent steps can be merged.
         return [] of Result if steps_interact?(chain)
 
-        [Result.new(
+        [build_result(call, context)]
+      end
+
+      # # A `gsub` called on another `gsub` — the only shape this rule covers.
+      private def chain_of_gsubs?(node : Crystal::Call) : Bool
+        return false unless node.name == "gsub"
+
+        receiver = node.obj
+        receiver.is_a?(Crystal::Call) && receiver.name == "gsub"
+      end
+
+      private def build_result(node : Crystal::Call, context : Context) : Result
+        Result.new(
           rule_id: id,
           severity: severity,
           message: "Combine multiple `gsub` calls into a single pass",
@@ -50,7 +59,7 @@ module Catalyst
           column: node.name_location.try(&.column_number) || 0,
           suggestion: "Combine multiple `gsub` calls into a single `gsub` with a hash argument",
           confidence: "medium",
-        )]
+        )
       end
 
       private def counted_in_chain?(node : Crystal::Call) : Bool
