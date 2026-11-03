@@ -103,16 +103,31 @@ call, so it is opt-in rather than built in.
 
 All 44 rules are documented in the [Wiki](https://github.com/unurgunite/catalyst/wiki). Numbers are not contiguous: CAT-019, 024, 036, 040, 044, 046, 047 and 048 were removed, and their numbers stay retired so an old `ignore` entry still means what it did.
 
-Two rules are off by default, because their advice cannot be told apart
+Six rules are off by default, because their advice cannot be told apart
 from correct code by looking at the source:
 
 | Rule | Why it is off | Turn it on with |
 |------|---------------|-----------------|
 | CAT-014 | Whether a file is read whole or streamed depends on its size, which is not in the code. On 3166 third-party files all 49 findings were `File.read` on a config, a test fixture, or a method returning `String`. | `--rules CAT-014` |
-| CAT-016 | Union type capacity hints depend on how the program is deployed. | `rules: {CAT-016: {enabled: true}}` |
+| CAT-015 | Struct versus class is a memory decision that depends on the data's lifetime, which the syntax does not show. | `--rules CAT-015` |
+| CAT-017 | Whether local time is wrong depends on how and where the program runs. | `--rules CAT-017` |
+| CAT-038 | A capacity hint only pays off when the final size is known, and that is a runtime fact. | `--rules CAT-038` |
+| CAT-045 | Whether a `raise` is an expected failure or a bug is a trust-boundary question no syntax answers. | `--rules CAT-045` |
+| CAT-049 | A thread is only the wrong choice when a fiber really suffices. | `--rules CAT-049` |
 
-Either form works for both; `--rules` re-enables a rule for one run, a
-config entry for good.
+Either form works for every one of them; `--rules` re-enables a rule for
+one run, a config entry for good:
+
+```yaml
+rules:
+  CAT-014:
+    enabled: true
+```
+
+`catalyst --list-rules` marks them with `[opt-in]`. Turning one on does not
+lift it above `--severity`: CAT-014 reports `info` outside a loop, so a
+default `warning` run still hides it — add `--severity hint` when you want
+the full picture.
 
 Quick reference:
 ```bash

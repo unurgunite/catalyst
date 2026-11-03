@@ -1,5 +1,5 @@
 name: catalyst
-version: 0.9.0
+version: 0.9.1
 crystal: ">= 1.12.0"
 license: MIT
 
@@ -21,3 +21,10 @@ development_dependencies:
   ameba-method_length:
     github: unurgunite/ameba-method_length
     version: 0.1.1
+
+scripts:
+  # shards does a full mirror clone, so a consumer downloads bench/, spec/,
+  # .github/ and this repo's own tooling alongside src/. Compiling the library
+  # needs only src/ and scripts/generate_rules_require.cr, so drop the rest.
+  # `shards install --skip-postinstall` keeps everything.
+  postinstall: sh scripts/trim_shard.sh
