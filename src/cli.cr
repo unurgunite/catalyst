@@ -24,7 +24,7 @@ module Catalyst
           parser.on("--severity LEVEL", "Minimum severity: error|warning|info|hint") { |v| options.min_severity = v }
           parser.on("--fix", "Apply safe auto-fixes") { options.fix = true }
           parser.on("--dry-run", "Show what --fix would change without writing") { options.dry_run = true }
-          parser.on("--ci", "CI mode — exit code 1 on any finding") { options.ci = true }
+          parser.on("--ci", "CI mode — exit code 1 on findings at or above --severity") { options.ci = true }
           parser.on("--rules RULES", "Comma-separated rule IDs to enable") { |v| options.rules = v.split(",") }
           parser.on("--ignore RULES", "Comma-separated rule IDs to disable") { |v| options.ignore = v.split(",") }
           parser.on("--baseline PATH", "Report only findings absent from baseline file") { |v| options.baseline = v }
