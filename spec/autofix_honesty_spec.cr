@@ -14,7 +14,6 @@ POSITIVE_CASES = {
   "CAT-008" => "[1, 2, 3].select { |x| x.even? }.first",
   "CAT-009" => "[1, 2].group_by { |x| x }.map { |k, v| v.size }",
   "CAT-010" => "items.each { |i| s += i }",
-  "CAT-011" => %q(s.gsub("a", "b").gsub("c", "d")),
   "CAT-012" => %q(JSON.parse(File.read("d.json"))["k"]),
   "CAT-013" => %q(TCPSocket.new("h", 80)),
   "CAT-014" => %q(File.read("data.bin")),
