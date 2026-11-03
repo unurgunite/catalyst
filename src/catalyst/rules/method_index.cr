@@ -13,7 +13,8 @@ module Catalyst
     record MethodInfo,
       name : String,
       body : Range(Int32, Int32),
-      takes_block : Bool
+      takes_block : Bool,
+      owner : String = ""
 
     # # Every `def` in `source`, keyed by the line the method starts on.
     # # Empty when the source does not parse.
@@ -35,6 +36,30 @@ module Catalyst
         by_name[info.name] = by_name[info.name]? || info.takes_block
       end
       by_name
+    end
+
+    # # Method names declared in `source` that take a block, keyed by the
+    # # type that declares them (`App::Log`), so a method called on one type
+    # # does not inherit a block overload declared on a different one.
+    def self.blocks_by_owner(source : String) : Hash(String, Set(String))
+      by_owner = {} of String => Set(String)
+      index_methods(source).each_value do |info|
+        next unless info.takes_block
+        by_owner[info.owner] ||= Set(String).new
+        by_owner[info.owner] << info.name
+      end
+      by_owner
+    end
+
+    # # Type names (`App::Log`, `App`) and constant names declared in
+    # # `source`. A bare `Log` in code is the stdlib logger only when this
+    # # set does not declare something that resolves to that name.
+    def self.declared_names(source : String) : Set(String)
+      finder = DeclarationFinder.new
+      Crystal::Parser.parse(source).accept(finder)
+      finder.names
+    rescue Crystal::SyntaxException
+      Set(String).new
     end
 
     # # The body line range of the innermost method containing `line`,
@@ -67,7 +92,21 @@ module Catalyst
     private class MethodIndexer < Crystal::Visitor
       getter methods = {} of Int32 => MethodInfo
 
+      def initialize
+        @scope = [] of String
+      end
+
       def visit(node : Crystal::ASTNode)
+        true
+      end
+
+      def visit(node : Crystal::ModuleDef)
+        @scope.push(node.name.to_s)
+        true
+      end
+
+      def visit(node : Crystal::ClassDef)
+        @scope.push(node.name.to_s)
         true
       end
 
@@ -80,9 +119,59 @@ module Catalyst
             name: node.name,
             body: (start_line + 1)..(end_line - 1),
             takes_block: node.block_arg != nil,
+            owner: @scope.join("::"),
           )
         end
         true
+      end
+
+      def end_visit(node : Crystal::ModuleDef)
+        @scope.pop
+      end
+
+      def end_visit(node : Crystal::ClassDef)
+        @scope.pop
+      end
+    end
+
+    # # Type and constant names declared in a file, fully qualified.
+    private class DeclarationFinder < Crystal::Visitor
+      getter names = Set(String).new
+
+      def initialize
+        @scope = [] of String
+      end
+
+      def visit(node : Crystal::ASTNode)
+        true
+      end
+
+      def visit(node : Crystal::ModuleDef)
+        enter(node.name.to_s)
+        true
+      end
+
+      def visit(node : Crystal::ClassDef)
+        enter(node.name.to_s)
+        true
+      end
+
+      def visit(node : Crystal::Assign)
+        @names << node.target.to_s if node.target.is_a?(Crystal::Path)
+        true
+      end
+
+      def end_visit(node : Crystal::ModuleDef)
+        @scope.pop
+      end
+
+      def end_visit(node : Crystal::ClassDef)
+        @scope.pop
+      end
+
+      private def enter(name : String) : Nil
+        @scope.push(name)
+        @names << @scope.join("::")
       end
     end
   end

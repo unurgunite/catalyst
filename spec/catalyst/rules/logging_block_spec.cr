@@ -21,7 +21,10 @@ module Catalyst
 
       describe "#check" do
         it "detects Log.info with interpolation" do
+          # The stdlib logger is only reachable when the file pulls it in;
+          # without that, a bare `Log` is someone else's module.
           code = <<-'CR'
+            require "log"
             name = "x"
             Log.info("hello #{name}")
             CR
@@ -30,6 +33,7 @@ module Catalyst
 
         it "detects Log.for(...).info with interpolation" do
           code = <<-'CR'
+            require "log"
             name = "x"
             Log.for("ctx").info("hello #{name}")
             CR
@@ -87,6 +91,73 @@ module Catalyst
             info("hello #{name}")
             CR
           assert_no_finding(rule, code)
+        end
+
+        it "ignores the stdlib name when the file declares its own Log" do
+          # A bare `Log` on a line outside `App` resolves to the stdlib, but
+          # from the name alone it is indistinguishable from `App::Log`, so
+          # the rule stays silent rather than risk a rewrite that does not
+          # compile. Reported by two independent reviewers.
+          code = "#{custom_log}\nname = \"x\"\nLog.info(\"hello \#{name}\")\n"
+          assert_no_finding(rule, code)
+        end
+
+        it "detects an explicit ::Log without a require" do
+          # `::Log` names the global type, so it needs no declaration here.
+          code = <<-'CR'
+            name = "x"
+            ::Log.info("hello #{name}")
+            CR
+          assert_finding(rule, code)
+        end
+
+        it "ignores a bare Log in a file that does not require the stdlib one" do
+          # A project's own `Log` commonly lives in another file, so nothing
+          # in this file says whether the block form compiles. Staying quiet
+          # is the only answer that cannot break a build.
+          code = <<-'CR'
+            name = "x"
+            Log.info("hello #{name}")
+            CR
+          assert_no_finding(rule, code)
+        end
+
+        it "ignores a block overload declared on a different type" do
+          # `Mine.info` takes a block; `App.info` does not. Keying the lookup
+          # by method name alone reported both.
+          code = <<-'CR'
+            class Mine
+              def self.info(message : String, &)
+                puts yield
+              end
+            end
+
+            class App
+              def self.info(message : String)
+                puts message
+              end
+            end
+
+            name = "x"
+            App.info("hello #{name}")
+            CR
+          assert_no_finding(rule, code)
+        end
+
+        it "detects a non-Log module that declares a block overload" do
+          code = <<-'CR'
+            module App
+              class Reporter
+                def self.info(message : String, &)
+                  puts yield
+                end
+              end
+            end
+
+            name = "x"
+            App::Reporter.info("hello #{name}")
+            CR
+          assert_finding(rule, code)
         end
       end
 
