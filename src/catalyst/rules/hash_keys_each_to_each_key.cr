@@ -54,36 +54,57 @@ module Catalyst
         keys = call.obj.as(Crystal::Call)
         return [] of Result unless hash_receiver?(keys.obj)
 
+        [build_result(call, context)]
+      end
+
+      private def build_result(call : Crystal::Call, context : Context) : Result
         line = call.location.try(&.line_number) || 0
         col = call.name_location.try(&.column_number) || 0
 
-        if (blk = call.block) && (body = blk.body) && mutates_receiver?(call, body)
-          [Result.new(
-            rule_id: id,
-            severity: severity,
-            message: "Use `each_key` instead of `keys.each` (the block mutates the hash — verify iteration safety before converting: `.keys` snapshots, `each_key` iterates live)",
-            file: context.file,
-            line: line,
-            column: col,
-            suggestion: "Replace `keys.each` with `each_key` only if the block does not mutate the hash during iteration",
-            confidence: "low",
-          )]
+        if mutating_block?(call)
+          mutating_result(context, line, col)
         else
-          line_text = context.line_text(line)
-          fix = sub_code(line_text, ".keys.each", ".each_key")
-
-          [Result.new(
-            rule_id: id,
-            severity: severity,
-            message: "Use `each_key` instead of `keys.each`",
-            file: context.file,
-            line: line,
-            column: col,
-            suggestion: "Replace `keys.each` with `each_key`",
-            confidence: "high",
-            fix_replacement: fix,
-          )]
+          plain_result(context, line, col)
         end
+      end
+
+      # # `.keys` snapshots the hash, `each_key` iterates it live, so a
+      # # mutating block makes the rewrite unsafe — reported, but never fixed.
+      private def mutating_block?(call : Crystal::Call) : Bool
+        case blk = call.block
+        when Crystal::Block
+          body = blk.body
+          body ? mutates_receiver?(call, body) : false
+        else
+          false
+        end
+      end
+
+      private def mutating_result(context : Context, line : Int32, col : Int32) : Result
+        Result.new(
+          rule_id: id,
+          severity: severity,
+          message: "Use `each_key` instead of `keys.each` (the block mutates the hash — verify iteration safety before converting: `.keys` snapshots, `each_key` iterates live)",
+          file: context.file,
+          line: line,
+          column: col,
+          suggestion: "Replace `keys.each` with `each_key` only if the block does not mutate the hash during iteration",
+          confidence: "low",
+        )
+      end
+
+      private def plain_result(context : Context, line : Int32, col : Int32) : Result
+        Result.new(
+          rule_id: id,
+          severity: severity,
+          message: "Use `each_key` instead of `keys.each`",
+          file: context.file,
+          line: line,
+          column: col,
+          suggestion: "Replace `keys.each` with `each_key`",
+          confidence: "high",
+          fix_replacement: sub_code(context.line_text(line), ".keys.each", ".each_key"),
+        )
       end
 
       # # True when the receiver is recognisably a Hash.

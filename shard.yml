@@ -1,5 +1,5 @@
 name: catalyst
-version: 0.8.1
+version: 0.8.2
 crystal: ">= 1.12.0"
 license: MIT
 
@@ -18,3 +18,6 @@ development_dependencies:
   ameba:
     github: crystal-ameba/ameba
     version: 1.7.0
+  ameba-method_length:
+    github: unurgunite/ameba-method_length
+    version: 0.1.1

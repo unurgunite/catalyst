@@ -19,7 +19,6 @@ module Catalyst
         OptionParser.parse(args) do |parser|
           parser.banner = "Usage: catalyst [options] <path> [path...]"
 
-          parser.banner = "Usage: catalyst [options] <path> [path...]"
           parser.on("--config PATH", "Path to config file") { |v| config_path = v }
           parser.on("--format FORMAT", "Output format: terminal|json|sarif") { |v| options.format = v }
           parser.on("--severity LEVEL", "Minimum severity: error|warning|info|hint") { |v| options.min_severity = v }
@@ -47,7 +46,6 @@ module Catalyst
     def self.run(args : Array(String) = ARGV) : Int32
       options = parse_options(args)
       return 2 unless options
-
       return 0 if options.version? || options.help?
 
       if options.list_rules?
@@ -55,34 +53,55 @@ module Catalyst
         return 0
       end
 
-      if Rule.all.empty?
-        STDERR.puts "catalyst: no rules loaded — refusing to report a clean result."
-        STDERR.puts "catalyst: hint: rebuild from the repository root (`crystal build src/catalyst.cr`), then retry."
-        return 2
-      end
+      return 2 unless rules_loaded?
 
       config = resolve_config(options)
       return 2 unless config
 
+      analyze(config, options, args)
+    end
+
+    # # Refuse to report a clean result when no rules are in the binary —
+    # # that is a build mistake, not clean code.
+    private def self.rules_loaded? : Bool
+      return true unless Rule.all.empty?
+
+      STDERR.puts "catalyst: no rules loaded — refusing to report a clean result."
+      STDERR.puts "catalyst: hint: rebuild from the repository root (`crystal build src/catalyst.cr`), then retry."
+      false
+    end
+
+    # # Run the analysis and turn the outcome into an exit code.
+    private def self.analyze(config : Config, options : Options, args : Array(String)) : Int32
       runner = Runner.new(config, options)
-      begin
-        results = runner.run(args)
-      rescue ex : ConfigError
-        # Corrupt baseline, unwritable baseline, unreadable input.
-        STDERR.puts "catalyst: #{ex.message}"
-        return 2
-      end
+      results = run_analysis(runner, args)
+      return 2 unless results
+      return 2 unless report(config, results)
 
-      begin
-        Formatter.for(config.format).output(results, STDOUT, config.severity)
-      rescue ex : ArgumentError
-        STDERR.puts "catalyst: #{ex.message}"
-        return 2
-      end
+      exit_code(results, options, runner.errors)
+    end
 
+    # # A corrupt baseline and an unreadable input file are user errors, not
+    # # crashes: report and return nil.
+    private def self.run_analysis(runner : Runner, args : Array(String)) : Array(Result)?
+      runner.run(args)
+    rescue ex : ConfigError
+      STDERR.puts "catalyst: #{ex.message}"
+      nil
+    end
+
+    # # Write the report. Returns false when the formatter refuses the output.
+    private def self.report(config : Config, results : Array(Result)) : Bool
+      Formatter.for(config.format).output(results, STDOUT, config.severity)
+      true
+    rescue ex : ArgumentError
+      STDERR.puts "catalyst: #{ex.message}"
+      false
+    end
+
+    private def self.exit_code(results : Array(Result), options : Options, errors : Int32) : Int32
       # Never report success on input we failed to analyze.
-      return 2 if runner.errors > 0
-
+      return 2 if errors > 0
       return 1 if options.ci? && !results.empty?
 
       0
@@ -102,24 +121,41 @@ module Catalyst
     # # NOTE: `Config` is a struct — return the mutated copy, a plain
     # # in-place update inside this method would be discarded.
     private def self.apply_overrides(config : Config, options : Options) : Config?
-      if severity = options.min_severity
-        unless SEVERITY_LEVELS.includes?(severity)
-          STDERR.puts "catalyst: invalid --severity #{severity.inspect} (expected #{SEVERITY_LEVELS.join("|")})"
-          return nil
-        end
-        config.severity = severity
-      end
+      config = apply_severity(config, options)
+      return nil unless config
       if format = options.format
         config.format = format
       end
+      return nil unless valid_format?(config.format)
 
-      # Formatter.for falls back to terminal for unknown names, so a typo in
-      # config or flags would silently change the output format.
-      unless FORMATS.includes?(config.format.downcase)
-        STDERR.puts "catalyst: invalid format #{config.format.inspect} (expected #{FORMATS.join("|")})"
+      config
+    end
+
+    # # `--severity` wins over the file value. Returns the updated config, or
+    # # nil when the flag is invalid.
+    ##
+    # # NOTE: `Config` is a struct — the mutated copy is returned, an in-place
+    # # update in the caller would be discarded.
+    private def self.apply_severity(config : Config, options : Options) : Config?
+      severity = options.min_severity
+      return config unless severity
+
+      unless SEVERITY_LEVELS.includes?(severity)
+        STDERR.puts "catalyst: invalid --severity #{severity.inspect} (expected #{SEVERITY_LEVELS.join("|")})"
         return nil
       end
+
+      config.severity = severity
       config
+    end
+
+    # # Formatter.for falls back to terminal for unknown names, so a typo in
+    # # config or flags would silently change the output format.
+    private def self.valid_format?(format : String) : Bool
+      return true if FORMATS.includes?(format.downcase)
+
+      STDERR.puts "catalyst: invalid format #{format.inspect} (expected #{FORMATS.join("|")})"
+      false
     end
 
     # # Test seam: `apply_overrides` is private but callers (specs) need to
