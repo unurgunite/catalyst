@@ -65,12 +65,20 @@ dirs.each do |dir|
 
     ratios = [] of Float64
     output_text.each_line do |line|
-      if line =~ /(\d+\.\d+)x faster/
+      # Each benchmark states the speedup of the recommended form over the
+      # form the rule flags, as "Nx faster". A line saying "Nx slower" means
+      # the flagged form wins, i.e. a speedup of 1/N. Benchmarks that make no
+      # speed claim (safety rules, detection cost) print neither and are
+      # reported as n/a instead of a misleading 0.
+      if line =~ /(\d+(?:\.\d+)?)x faster/
         ratios << $1.to_f
+      elsif line =~ /(\d+(?:\.\d+)?)x slower/
+        speedup = $1.to_f
+        ratios << (speedup > 0 ? 1.0 / speedup : 0.0)
       end
     end
 
-    best_ratio = ratios.max? || 0.0
+    best_ratio = ratios.max? || Float64::NAN
 
     results << {
       rule:        rule,
@@ -100,15 +108,18 @@ puts "  #{sprintf("%-12s", "Category")}  #{sprintf("%-8s", "Rule")}  #{sprintf("
 puts "  #{"-" * 80}"
 
 sorted_results.each do |r|
-  verdict = if r[:best_ratio] >= 5.0
+  verdict = if r[:best_ratio].nan?
+              "n/a"
+            elsif r[:best_ratio] >= 5.0
               "significant"
             elsif r[:best_ratio] >= 2.0
               "moderate"
             else
               "negligible"
             end
+  ratio_text = r[:best_ratio].nan? ? "-" : sprintf("%.2f", r[:best_ratio])
 
-  puts "  #{sprintf("%-12s", r[:category])}  #{sprintf("%-8s", r[:rule])}  #{sprintf("%-30s", r[:description])}  #{sprintf("%-10.2f", r[:best_ratio])}  #{verdict}"
+  puts "  #{sprintf("%-12s", r[:category])}  #{sprintf("%-8s", r[:rule])}  #{sprintf("%-30s", r[:description])}  #{sprintf("%-10s", ratio_text)}  #{verdict}"
 end
 
 puts ""

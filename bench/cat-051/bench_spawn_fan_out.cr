@@ -38,12 +38,15 @@ puts ""
     fibers.times { done.receive }
   end
 
-  ratio = bounded.real > 0 ? (unbounded.real / bounded.real).round(2) : Float64::INFINITY
+  cost = unbounded.real > 0 ? (bounded.real / unbounded.real).round(2) : Float64::INFINITY
 
   puts "fibers=#{fibers.to_s.ljust(4)} permits=#{permits}  unbounded=#{unbounded.real.round(6).to_s.ljust(9)}s  " \
-       "gated=#{bounded.real.round(6).to_s.ljust(9)}s  unbounded is #{ratio}x faster"
+       "gated=#{bounded.real.round(6).to_s.ljust(9)}s  gate costs #{cost}x"
 end
 
 puts ""
 puts "Fan-out above permits multiplies queued fibers x permits; the product,"
 puts "not the timing, is what CAT-051 reports."
+puts ""
+puts "There is no speedup to report: the semaphore gate is slower than an"
+puts "unbounded burst for the same work, and its payoff is the bound itself."
