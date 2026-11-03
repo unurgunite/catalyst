@@ -52,25 +52,30 @@ module Catalyst
         node_has_size_on_arg?(block.body, arg_names)
       end
 
-      # ameba:disable Metrics/CyclomaticComplexity
       private def node_has_size_on_arg?(node : Crystal::ASTNode, arg_names : Array(String)) : Bool
         case node
         when Crystal::Call
-          if node.name == "size" && node.args.empty?
-            if (obj = node.obj).is_a?(Crystal::Var) && arg_names.includes?(obj.name)
-              return true
-            end
-          end
+          return true if calls_size_on_arg?(node, arg_names)
           return true if (obj = node.obj) && node_has_size_on_arg?(obj, arg_names)
           return true if node.args.any? { |arg| node_has_size_on_arg?(arg, arg_names) }
-        when Crystal::TupleLiteral
-          return true if node.elements.any? { |elem| elem.is_a?(Crystal::ASTNode) && node_has_size_on_arg?(elem, arg_names) }
-        when Crystal::ArrayLiteral
-          return true if node.elements.any? { |elem| elem.is_a?(Crystal::ASTNode) && node_has_size_on_arg?(elem, arg_names) }
+        when Crystal::TupleLiteral, Crystal::ArrayLiteral
+          return true if any_child_has_size?(node.elements, arg_names)
         when Crystal::Expressions
-          return true if node.expressions.any? { |elem| elem.is_a?(Crystal::ASTNode) && node_has_size_on_arg?(elem, arg_names) }
+          return true if any_child_has_size?(node.expressions, arg_names)
         end
         false
+      end
+
+      # # `<arg>.size` — the counted value is only computed to be measured.
+      private def calls_size_on_arg?(call : Crystal::Call, arg_names : Array(String)) : Bool
+        return false unless call.name == "size" && call.args.empty?
+
+        obj = call.obj
+        obj.is_a?(Crystal::Var) && arg_names.includes?(obj.name)
+      end
+
+      private def any_child_has_size?(children : Array(Crystal::ASTNode), arg_names : Array(String)) : Bool
+        children.any? { |elem| node_has_size_on_arg?(elem, arg_names) }
       end
 
       Rule.all << self.new

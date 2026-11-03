@@ -65,11 +65,7 @@ module Catalyst
         # Parent (from_yaml/from_json) is visited before the nested
         # File.read, so remember reads that feed config parsing.
         if parse_call = config_parse_call(node)
-          if first_arg = parse_call.args.first?
-            if inner = file_read_call(first_arg)
-              @config_parse_reads << inner.object_id
-            end
-          end
+          remember_config_read(parse_call)
           return [] of Result
         end
 
@@ -78,33 +74,46 @@ module Catalyst
         return [] of Result if @config_parse_reads.includes?(call.object_id)
         return [] of Result if config_file?(call)
 
-        line = call.location.try(&.line_number) || 0
-        col = call.name_location.try(&.column_number) || 0
+        [build_result(call, context)]
+      end
 
-        # A static check cannot know the file size: a one-off read of a
-        # small file is idiomatic, a repeated whole-file read in a loop is
-        # not. Loop reads stay warning/medium; one-off reads are low
-        # confidence info with an if-large caveat.
-        if @loop_depth > 0
-          sev = severity
-          message = "Use streaming (`File.open`) instead of `File.#{call.name}` for large files"
-          confidence = "medium"
-        else
-          sev = "info"
-          message = "Use streaming (`File.open`) instead of `File.#{call.name}` for large files if the file can be large"
-          confidence = "low"
-        end
+      private def remember_config_read(parse_call : Crystal::Call) : Nil
+        first_arg = parse_call.args.first?
+        return unless first_arg
 
-        [Result.new(
+        inner = file_read_call(first_arg)
+        @config_parse_reads << inner.object_id if inner
+      end
+
+      # # A static check cannot know the file size: a one-off read of a small
+      # # file is idiomatic, a repeated whole-file read in a loop is not. Loop
+      # # reads stay warning/medium; one-off reads are low-confidence info
+      # # with an if-large caveat.
+      private def build_result(call : Crystal::Call, context : Context) : Result
+        sev, message, confidence = loop_advice(call)
+
+        Result.new(
           rule_id: id,
           severity: sev,
           message: message,
           file: context.file,
-          line: line,
-          column: col,
+          line: call.location.try(&.line_number) || 0,
+          column: call.name_location.try(&.column_number) || 0,
           suggestion: "Replace `File.#{call.name}` with `File.open` for streaming",
           confidence: confidence,
-        )]
+        )
+      end
+
+      private def loop_advice(call : Crystal::Call) : {String, String, String}
+        if @loop_depth > 0
+          {severity,
+           "Use streaming (`File.open`) instead of `File.#{call.name}` for large files",
+           "medium"}
+        else
+          {"info",
+           "Use streaming (`File.open`) instead of `File.#{call.name}` for large files if the file can be large",
+           "low"}
+        end
       end
 
       private def file_read_call(node : Crystal::ASTNode) : Crystal::Call?
