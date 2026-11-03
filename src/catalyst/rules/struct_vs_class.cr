@@ -38,52 +38,48 @@ module Catalyst
 
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         return [] of Result unless node.is_a?(Crystal::ClassDef)
+        return [] of Result unless small_data_class?(node)
 
-        return [] of Result if node.struct?
+        [build_result(node, context)]
+      end
 
+      # # A plain class with a handful of ivars and no behaviour.
+      private def small_data_class?(node : Crystal::ClassDef) : Bool
+        return false if node.struct?
         superclass = node.superclass
-        return [] of Result if superclass && !reference_path?(superclass)
+        return false if superclass && !reference_path?(superclass)
 
         ivar_count, has_non_accessor = analyze_body(node.body)
+        !has_non_accessor && ivar_count > 0 && ivar_count <= @max_ivars
+      end
 
-        return [] of Result if has_non_accessor
-        return [] of Result if ivar_count == 0 || ivar_count > @max_ivars
-
+      private def build_result(node : Crystal::ClassDef, context : Context) : Result
         class_name = node_name_string(node.name)
-        line = node.location.try(&.line_number) || 0
-        col = node.name_location.try(&.column_number) || 0
-
-        [Result.new(
+        Result.new(
           rule_id: id,
           severity: severity,
           message: "Use Struct instead of Class for `#{class_name}`",
           file: context.file,
-          line: line,
-          column: col,
+          line: node.location.try(&.line_number) || 0,
+          column: node.name_location.try(&.column_number) || 0,
           suggestion: "Change `class #{class_name}` to `struct #{class_name}`",
           confidence: "medium"
-        )]
+        )
       end
 
       private def analyze_body(body : Crystal::ASTNode?) : {Int32, Bool}
-        ivar_count = 0
-        has_non_accessor = false
+        return {0, false} unless body
 
-        return {ivar_count, false} unless body
-
-        if body.is_a?(Crystal::Expressions)
-          body.expressions.each do |exp|
-            result = analyze_expression(exp)
-            ivar_count += result[0]
-            has_non_accessor = true if result[1]
-          end
-        else
-          result = analyze_expression(body)
-          ivar_count = result[0]
-          has_non_accessor = result[1]
+        exprs = body.is_a?(Crystal::Expressions) ? body.expressions : [body]
+        total = 0
+        non_accessor = false
+        exprs.each do |exp|
+          count, flag = analyze_expression(exp)
+          total += count
+          non_accessor = true if flag
         end
 
-        {ivar_count, has_non_accessor}
+        {total, non_accessor}
       end
 
       private def analyze_expression(node : Crystal::ASTNode) : {Int32, Bool}

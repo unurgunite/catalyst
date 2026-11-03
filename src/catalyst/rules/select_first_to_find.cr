@@ -67,20 +67,29 @@ module Catalyst
         body_col = block.try(&.body).try(&.location.try(&.column_number))
         return nil unless block && start_col && body_col
 
-        # First `}` at or after the body is the block's own closing brace.
-        closing = line.index('}', body_col - 1)
+        closing = closing_brace(line, body_col)
         return nil unless closing
-
-        # `.first`/`first?` follow the brace and are the calls being removed.
-        # `.first(2)` keeps the argument form, which `find` does not have.
-        rest = line[(closing + 1)..]
-        return nil if rest.starts_with?(".first(")
-        return nil unless rest.starts_with?(".first")
-        suffix = rest.starts_with?(".first?") ? rest[7..]? : rest[6..]?
+        suffix = first_suffix(line, closing)
+        return nil unless suffix
 
         # Keep the receiver, rename the call, keep the block, drop `.first`.
         name_end = start_col - 1 + (select_call.try(&.name.size) || 6)
-        line[0...(start_col - 1)] + replacement + line[name_end..closing] + (suffix || "")
+        line[0...(start_col - 1)] + replacement + line[name_end..closing] + suffix
+      end
+
+      # # First `}` at or after the block body is the block's own closing brace.
+      private def closing_brace(line : String, body_col : Int32) : Int32?
+        line.index('}', body_col - 1)
+      end
+
+      # # What follows the closing brace: `.first(2)` keeps its argument, which
+      # # `find` does not have, so that shape is not fixed.
+      private def first_suffix(line : String, closing : Int32) : String?
+        rest = line[(closing + 1)..]
+        return nil if rest.starts_with?(".first(")
+        return nil unless rest.starts_with?(".first")
+
+        rest.starts_with?(".first?") ? rest[7..]? : rest[6..]?
       end
 
       # # If node is `select{}.first` / `{}.first?`, return the outer call node.
