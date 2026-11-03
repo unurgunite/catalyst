@@ -14,12 +14,11 @@ module Catalyst
       }
 
       # # Write findings as colorized lines with severity, location, and suggestion.
-      def output(results : Array(Result), io : IO, min_severity : String) : Nil
-        filtered = filter_by_severity(results, min_severity)
-        return if filtered.empty?
+      def output(results : Array(Result), io : IO) : Nil
+        return if results.empty?
 
-        filtered.each { |result| write_result(io, result) }
-        write_summary(io, filtered)
+        results.each { |result| write_result(io, result) }
+        write_summary(io, results)
       end
 
       # # One finding: location line, optional suggestion, help link, blank line.

@@ -55,4 +55,26 @@ describe Catalyst::CLI do
       Catalyst::CLI.run(["--config", config, "--baseline", baseline, source]).should eq(2)
     end
   end
+
+  # The exit code and the report must agree on what counts as a finding.
+  # Severity filtering used to run inside the formatters only, so `--ci` at a
+  # severity above the findings' own exited 1 while printing nothing at all.
+  describe "--ci" do
+    it "exits 0 when every finding is below the minimum severity" do
+      temp_dir do |dir|
+        config = write(dir, ".catalyst.yml", "severity: error\nformat: terminal\n")
+        # CAT-041 is info, so an error-level gate has nothing to report.
+        source = write(dir, "a.cr", "def f(urls)\n  urls.each { |u| URI.parse(u) }\nend\n")
+        Catalyst::CLI.run(["--config", config, "--ci", source]).should eq(0)
+      end
+    end
+
+    it "exits 1 when a finding meets the minimum severity" do
+      temp_dir do |dir|
+        config = write(dir, ".catalyst.yml", "severity: hint\nformat: terminal\n")
+        source = write(dir, "a.cr", "def f(urls)\n  urls.each { |u| URI.parse(u) }\nend\n")
+        Catalyst::CLI.run(["--config", config, "--ci", source]).should eq(1)
+      end
+    end
+  end
 end

@@ -5,8 +5,8 @@ module Catalyst
     # # JSON array output. Each result is a JSON object in the array.
     class Json < Formatter
       # # Write findings as a JSON array to IO.
-      def output(results : Array(Result), io : IO, min_severity : String) : Nil
-        io.puts filter_by_severity(results, min_severity).to_json
+      def output(results : Array(Result), io : IO) : Nil
+        io.puts results.to_json
       end
     end
 
@@ -15,10 +15,8 @@ module Catalyst
     # # with GitHub Code Scanning, VS Code, and other tools.
     class Sarif < Formatter
       # # Write findings as a SARIF document to IO.
-      def output(results : Array(Result), io : IO, min_severity : String) : Nil
-        filtered = filter_by_severity(results, min_severity)
-        sarif = generate_sarif(filtered)
-        io.puts sarif.to_json
+      def output(results : Array(Result), io : IO) : Nil
+        io.puts generate_sarif(results).to_json
       end
 
       private def generate_sarif(results : Array(Result))
