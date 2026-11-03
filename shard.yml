@@ -20,4 +20,4 @@ development_dependencies:
     version: 1.7.0
   ameba-method_length:
     github: unurgunite/ameba-method_length
-    version: 0.1.0
+    version: 0.1.1

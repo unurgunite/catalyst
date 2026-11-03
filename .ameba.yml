@@ -19,11 +19,9 @@ Globs:
 # the limit measures branching, not fixture size.
 Metrics/MethodLength:
   Enabled: true
-  # Only the body counts: the `def` line and the closing `end` carry no logic.
-  # The rule subtracts one line for `ExcludeLimit` but still counts `end`, so
-  # 16 here means a body of 15.
-  MaxLines: 16
-  ExcludeLimit: true
+  # Only body lines count (since ameba-method_length 0.1.1): `def`, `end`,
+  # blank lines and comment-only lines are excluded, matching RuboCop.
+  MaxLines: 15
   CountAsOne:
     - array
     - hash
