@@ -20,7 +20,7 @@ end
 
 # Shared bases must load before the rules that inherit from them.
 shared = rule_files.select do |file|
-  {"resource_leak_rule.cr", "loop_tracking.cr"}.includes?(File.basename(file))
+  {"resource_leak_rule.cr", "loop_tracking.cr", "method_index.cr"}.includes?(File.basename(file))
 end
 shared.each do |file|
   puts "require \"./catalyst/rules/#{File.basename(file)}\""
