@@ -33,11 +33,11 @@ class_time = Benchmark.measure do
   n.times { PointClass.new(1, 2) }
 end
 
-ratio = class_time.real > 0 ? (struct_time.real / class_time.real).round(3) : Float64::INFINITY
+alloc_speedup = struct_time.real > 0 ? (class_time.real / struct_time.real).round(2) : Float64::INFINITY
 
 puts "  PointStruct.new(1, 2) x #{n} = #{struct_time.real.round(6)}s"
 puts "  PointClass.new(1, 2) x #{n}   = #{class_time.real.round(6)}s"
-puts "  struct/class ratio: #{ratio} (lower = struct faster)"
+puts "  alloc: #{alloc_speedup}x faster (struct over class)"
 puts ""
 
 puts "Field access (#{n} reads):"
@@ -53,8 +53,8 @@ class_read_time = Benchmark.measure do
   n.times { p.x; p.y }
 end
 
-ratio_read = class_read_time.real > 0 ? (struct_read_time.real / class_read_time.real).round(3) : Float64::INFINITY
+read_speedup = struct_read_time.real > 0 ? (class_read_time.real / struct_read_time.real).round(2) : Float64::INFINITY
 
 puts "  struct field read:   #{struct_read_time.real.round(6)}s"
 puts "  class field read:    #{class_read_time.real.round(6)}s"
-puts "  struct/class ratio:  #{ratio_read} (lower = struct faster)"
+puts "  read: #{read_speedup}x faster (struct over class)"
