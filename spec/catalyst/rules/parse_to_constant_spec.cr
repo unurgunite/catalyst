@@ -41,11 +41,40 @@ module Catalyst
           assert_no_finding(rule, "uri = URI.parse(url)")
         end
 
-        it "flags variable argument inside loops as low confidence" do
-          results = run_rule(rule, "urls.each { |url| URI.parse(url) }")
-          results.size.should eq(1)
-          results.first.confidence.should eq("low")
-          results.first.message.should contain("if the same value")
+        it "ignores an argument the loop rebinds" do
+          # The advice is "parse it once outside the loop". Hoisting
+          # `URI.parse(url)` here would parse the first element only, so
+          # there is no rewrite to suggest. This case used to be reported
+          # as a low-confidence hint.
+          code = <<-CR
+            urls.each { |url| URI.parse(url) }
+            CR
+          assert_no_finding(rule, code)
+        end
+
+        it "ignores an argument derived from the loop variable" do
+          code = <<-CR
+            urls.each { |url| URI.parse(url.strip) }
+            CR
+          assert_no_finding(rule, code)
+        end
+
+        it "ignores an argument assigned inside the loop body" do
+          code = <<-CR
+            urls.each do |url|
+              target = url.strip
+              URI.parse(target)
+            end
+            CR
+          assert_no_finding(rule, code)
+        end
+
+        it "flags a value computed before the loop" do
+          code = <<-CR
+            host = "https://example.com"
+            names.each { |n| URI.parse(host) }
+            CR
+          assert_finding(rule, code)
         end
 
         it "flags literal argument with high confidence" do
