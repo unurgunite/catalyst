@@ -13,19 +13,14 @@ sides and flags products over `FAN_OUT_THRESHOLD = 1000`:
 - producers, collectors, prefills, `each` without spawn, bare `spawn`,
   resolved products ≤ 1000, non-`Nil` channels → silent.
 
-## Verification (not a microbenchmark)
+## Benchmark
 
-Fan-out detection has no meaningful microbenchmark — there is no
-"before/after" timing to measure. Verification is detection on fixtures:
-
-- `50.times + Channel(Nil).new(100)` → 1 finding, message shows the product;
-- `8.times + Channel(Nil).new(8)` → silent (64 ≤ 1000);
-- config-sourced operands → 1 `info`/`low` hint per file;
-- task queues (`Channel(String).new(1024)`), bare `spawn`, producers → silent.
-
-E2E: `info`/`low` hints on config-driven fan-out shapes,
-zero on catalyst's own `src/`.
+`bench_spawn_fan_out.cr` measures what the recommendation costs: an unbounded
+`fibers.times { spawn }` burst versus the same work through a
+`Channel(Nil)`-gated pool of 8 permits. The gate is the fix CAT-051 asks for,
+and it is not free — it serialises admission.
 
 ## Run
 
 `crystal spec spec/catalyst/rules/spawn_fan_out_spec.cr`
+`crystal run bench/cat-051/bench_spawn_fan_out.cr`
