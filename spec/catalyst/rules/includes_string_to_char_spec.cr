@@ -41,6 +41,34 @@ module Catalyst
         end
       end
 
+      describe "#fix_replacement" do
+        it "rewrites a one-char string literal to a char literal" do
+          fix_for(rule, %(s = "hello"\ns.includes?("x"))).should eq("s.includes?('x')")
+        end
+
+        it "keeps the rest of the line" do
+          fix_for(rule, %(s = "hello"\nok = !s.includes?("x"))).should eq(%(ok = !s.includes?('x')))
+        end
+
+        it "declines a multi-character literal" do
+          fix_for(rule, %(s = "hello"\ns.includes?("xy"))).should be_nil
+        end
+
+        it "declines an interpolated argument" do
+          fix_for(rule, %(s = "hello"\ns.includes?("\#{x}"))).should be_nil
+        end
+
+        it "fixes only the literal that belongs to the reported call" do
+          fix_for(rule, %(s = "hello"\ns.includes?("x") || s.includes?("y")))
+            .should eq(%(s.includes?('x') || s.includes?("y")))
+        end
+
+        it "leaves a second identical literal alone" do
+          fix_for(rule, %(s = "hello"\ns.includes?("x") || s.includes?("x")))
+            .should eq(%(s.includes?('x') || s.includes?("x")))
+        end
+      end
+
       describe "#id" do
         it "returns CAT-023" do
           rule.id.should eq("CAT-023")

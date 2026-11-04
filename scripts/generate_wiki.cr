@@ -179,12 +179,29 @@ def check_catalog : Nil
   raise "wiki catalog out of sync: missing #{missing.map(&.id)}, stale #{extra}"
 end
 
+SEVERITY_BADGE = {
+  "error"   => "\u{1F534} error",
+  "warning" => "\u{1F7E1} warning",
+  "info"    => "\u{1F535} info",
+  "hint"    => "\u{26AA} hint",
+}
+
 def fix_mark(rule : Catalyst::Rule) : String
   rule.auto_fixable? ? "yes" : "no"
 end
 
 def severity_cell(rule : Catalyst::Rule) : String
   rule.enabled_by_default? ? rule.severity : "#{rule.severity} (opt-in)"
+end
+
+# Metadata as a small table rather than a run-on blockquote. Opt-in status is
+# not repeated here: it already gets a WARNING callout below, where the reader
+# needs the instructions rather than another "no".
+def metadata(rule : Catalyst::Rule) : Array(String)
+  badge = SEVERITY_BADGE[rule.severity]? || rule.severity
+  fix = rule.auto_fixable? ? "yes — `catalyst --fix`" : "no"
+
+  ["| Severity | Auto-fix |", "|:---|:---|", "| #{badge} | #{fix} |", ""]
 end
 
 def notice(rule : Catalyst::Rule) : Array(String)
@@ -211,20 +228,142 @@ def code_sample(heading : String, code : String?) : Array(String)
   ["### #{heading}", "", "```crystal", code, "```", ""]
 end
 
+# One timed row from a bench README, e.g.
+#   n=1000    sort.first=9.2e-5 s  min=6.0e-6 s  15.89x faster
+# The bench scripts drifted into three spellings over the releases (the `s`
+# unit present or absent, a second label present or absent, one or two spaces
+# before `faster`), so the pattern accepts all of them and rejects prose.
+# Since the row stores only what is compared, the two labels come from the row
+# that happened to name them.
+alias BenchRow = NamedTuple(size: String, times: String, faster: String)
+
+# A README may compare more than one pair (sort.first vs min, then sort.last vs
+# max), so rows are grouped under the `=== heading ===` that introduced them.
+alias BenchGroup = NamedTuple(heading: String, labels: Tuple(String, String)?, rows: Array(BenchRow))
+
+alias BenchData = NamedTuple(env: String, groups: Array(BenchGroup))
+
+BENCH_ROW     = /^n=(\d+)\s+(?:(.+?)=([\d.]+(?:e-?\d+)?)\s*s?\s+(.+?)=([\d.]+(?:e-?\d+)?)\s*s?\s+)?([\d.]+)x\s+(faster|slower)/
+BENCH_HEADING = /^===\s*(.+?)\s*===$/
+BENCH_ENV     = /^## Results \((.+?)\)$/
+
+# Reads the numbers straight out of bench/cat-NNN/README.md so the wiki cannot
+# drift from the benchmark it links to. A bench that prints prose instead of
+# timed rows yields nil and the page falls back to the link alone.
+def bench_data(rule : Catalyst::Rule) : BenchData?
+  readme = File.join("bench", "cat-#{rule.id.lchop("CAT-")}", "README.md")
+  return nil unless File.exists?(readme)
+
+  text = File.read(readme)
+  env = text.lines.compact_map { |line| line[BENCH_ENV, 1]? }.first? || "unrecorded"
+  groups = parse_bench(text)
+  return nil if groups.empty?
+
+  {env: env, groups: groups}
+end
+
+def parse_bench(text : String) : Array(BenchGroup)
+  state = BenchState.new
+  text.each_line { |line| state.feed(line) }
+  state.finish
+end
+
+# Holds the group being accumulated while parse_bench walks the file. A small
+# class rather than a closure so each step stays readable.
+private class BenchState
+  @heading = ""
+  @labels : Tuple(String, String)? = nil
+  @rows = [] of BenchRow
+  @groups = [] of BenchGroup
+
+  def feed(line : String) : Nil
+    if heading = line[BENCH_HEADING, 1]?
+      flush
+      @heading, @labels, @rows = heading, nil, [] of BenchRow
+      return
+    end
+
+    matched = BENCH_ROW.match(line)
+    collect(matched) if matched
+  end
+
+  def finish : Array(BenchGroup)
+    flush
+    @groups
+  end
+
+  private def collect(matched : Regex::MatchData) : Nil
+    first = matched[2]?
+    second = matched[4]?
+    @labels = {first, second} if @labels.nil? && first && second
+    times = first && second ? "#{matched[3]} s / #{matched[5]} s" : "—"
+    @rows << {size: matched[1], times: times, faster: "#{matched[6]}x #{matched[7]}"}
+  end
+
+  private def flush : Nil
+    return if @rows.empty?
+
+    @groups << {heading: @heading, labels: @labels, rows: @rows}
+  end
+end
+
+def bench_table(group : BenchGroup) : Array(String)
+  first, second = group[:labels] || {"before", "after"}
+  lines = ["| n | #{first} → #{second} | Speed-up |", "|---:|:---|---:|"]
+  group[:rows].each do |row|
+    lines << "| #{row[:size]} | #{row[:times]} | **#{row[:faster]}** |"
+  end
+  lines
+end
+
+# Every comparison in the README gets its own table; five benches compare two
+# different pairs and a single merged table would repeat the `n` column.
+def bench_body(data : BenchData) : Array(String)
+  lines = ["*Recorded on #{data[:env]}.*", ""]
+  data[:groups].each do |group|
+    lines.concat(["**#{group[:heading]}**", ""]) unless group[:heading].empty?
+    lines.concat(bench_table(group))
+    lines << ""
+  end
+  lines
+end
+
+# The table is a recorded snapshot on one machine and one Crystal version, so
+# the heading that records those two facts travels with it.
+def benchmark_section(rule : Catalyst::Rule) : Array(String)
+  bench = "bench/cat-#{rule.id.lchop("CAT-")}/"
+  link = "> See [`#{bench}`](https://github.com/unurgunite/catalyst/tree/master/#{bench})"
+  lines = ["## Benchmark", ""]
+  data = bench_data(rule)
+
+  if data
+    lines.concat(bench_body(data))
+    lines.concat([link, "",
+                  "> [!NOTE]",
+                  "> Numbers are a single recorded run on the machine and Crystal version above,",
+                  "> not a guarantee. Re-run the benchmark on your own hardware before quoting them.",
+                  ""])
+  else
+    lines.concat(["> [!NOTE]", "> No timing table is published for this benchmark.", ">",
+                  link,
+                  ">",
+                  "> It prints its comparison when you run it; the numbers depend on the machine,",
+                  "> so they stay in the script rather than in this page.", ""])
+  end
+  lines
+end
+
 def page(rule : Catalyst::Rule, entry : Entry) : String
   lines = [] of String
   lines << "# #{rule.id} — #{entry[:title]}"
   lines << ""
-  lines << "> **Severity:** `#{rule.severity}` | **Auto-fix:** #{rule.auto_fixable? ? "yes" : "no"}"
-  lines << ""
+  lines.concat(metadata(rule))
   lines.concat(notice(rule))
   lines.concat(["## Description", "", rule.description, "", entry[:problem], ""])
   lines.concat(code_sample("Bad code", entry[:bad]))
   lines.concat(code_sample("Good code", entry[:good]))
-  bench = "bench/cat-#{rule.id.lchop("CAT-")}/"
-  lines.concat(["## Benchmark", "", "> [!NOTE]",
-                "> See [`#{bench}`](https://github.com/unurgunite/catalyst/tree/master/#{bench})", ""])
-  lines.join("\n")
+  lines.concat(benchmark_section(rule))
+  lines.join("\n") + "\n"
 end
 
 def rule_table(category : String, rules : Array(Catalyst::Rule)) : Array(String)
@@ -239,6 +378,23 @@ def rule_table(category : String, rules : Array(Catalyst::Rule)) : Array(String)
   lines.concat(["</details>", ""])
 end
 
+# A retired number is never reused, so the gap between the highest ID and the
+# live set is exactly the retired list. Deriving it keeps this sentence honest
+# after a rule is removed — the previous hardcoded version still named eight
+# numbers once nine had been retired.
+def retired_sentence : String
+  live = RULES.map(&.id.lchop("CAT-").to_i).to_set
+  highest = live.max
+  gaps = (1..highest).reject { |number| live.includes?(number) }
+  prefix = "**#{RULES.size} rules.**"
+
+  return "#{prefix} Numbers are not contiguous but no number has been retired." if gaps.empty?
+
+  list = gaps.map { |number| "CAT-#{number.to_s.rjust(3, '0')}" }.join(", ")
+  "#{prefix} Numbers are not contiguous: #{list} were removed, and their numbers stay retired " \
+  "so an old `ignore` entry still means what it did."
+end
+
 def home_header : Array(String)
   lines = [] of String
   lines.concat(["# Catalyst Rules", "",
@@ -249,9 +405,7 @@ def home_header : Array(String)
                 "- [Usage](https://github.com/unurgunite/catalyst#usage)",
                 "- [`catalyst --list-rules`](https://github.com/unurgunite/catalyst#usage)",
                 "", "## Rules", "",
-                "**#{RULES.size} rules.** Numbers are not contiguous: CAT-019, 024, 036, 040, 044, 046,",
-                "047 and 048 were removed, and their numbers stay retired so an old `ignore` entry",
-                "still means what it did.", ""])
+                retired_sentence, ""])
   unless RULES.all?(&.enabled_by_default?)
     lines.concat(["`opt-in` marks a rule that is off by default. Enable one for a single run with",
                   "`--rules <ID>`, or permanently with `rules: {<ID>: {enabled: true}}`.", ""])

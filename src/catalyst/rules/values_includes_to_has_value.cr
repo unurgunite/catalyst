@@ -13,6 +13,10 @@ module Catalyst
         "Use `has_value?` instead of `values.includes?`"
       end
 
+      def auto_fixable? : Bool
+        true
+      end
+
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         call = values_includes_call(node)
         return [] of Result unless call
@@ -28,8 +32,17 @@ module Catalyst
           line: line,
           column: col,
           suggestion: "Replace `values.includes?` with `has_value?`",
-          confidence: "high"
+          confidence: "high",
+          fix_replacement: fix_for(context.line_text(line))
         )]
+      end
+
+      # # `h.values.includes?(v)` and `h.has_value?(v)` answer the same question
+      # # and `values` allocates a copy of the value set first, so the rewrite is
+      # # exact. The line is only fixed when exactly one `values.includes?`
+      # # appears in code.
+      private def fix_for(line_text : String) : String?
+        sub_code_once(line_text, ".values.includes?", ".has_value?")
       end
 
       private def values_includes_call(node : Crystal::ASTNode) : Crystal::Call?
