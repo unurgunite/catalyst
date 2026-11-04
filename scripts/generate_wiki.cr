@@ -378,6 +378,23 @@ def rule_table(category : String, rules : Array(Catalyst::Rule)) : Array(String)
   lines.concat(["</details>", ""])
 end
 
+# A retired number is never reused, so the gap between the highest ID and the
+# live set is exactly the retired list. Deriving it keeps this sentence honest
+# after a rule is removed — the previous hardcoded version still named eight
+# numbers once nine had been retired.
+def retired_sentence : String
+  live = RULES.map(&.id.lchop("CAT-").to_i).to_set
+  highest = live.max
+  gaps = (1..highest).reject { |number| live.includes?(number) }
+  prefix = "**#{RULES.size} rules.**"
+
+  return "#{prefix} Numbers are not contiguous but no number has been retired." if gaps.empty?
+
+  list = gaps.map { |number| "CAT-#{number.to_s.rjust(3, '0')}" }.join(", ")
+  "#{prefix} Numbers are not contiguous: #{list} were removed, and their numbers stay retired " \
+  "so an old `ignore` entry still means what it did."
+end
+
 def home_header : Array(String)
   lines = [] of String
   lines.concat(["# Catalyst Rules", "",
@@ -388,9 +405,7 @@ def home_header : Array(String)
                 "- [Usage](https://github.com/unurgunite/catalyst#usage)",
                 "- [`catalyst --list-rules`](https://github.com/unurgunite/catalyst#usage)",
                 "", "## Rules", "",
-                "**#{RULES.size} rules.** Numbers are not contiguous: CAT-019, 024, 036, 040, 044, 046,",
-                "047 and 048 were removed, and their numbers stay retired so an old `ignore` entry",
-                "still means what it did.", ""])
+                retired_sentence, ""])
   unless RULES.all?(&.enabled_by_default?)
     lines.concat(["`opt-in` marks a rule that is off by default. Enable one for a single run with",
                   "`--rules <ID>`, or permanently with `rules: {<ID>: {enabled: true}}`.", ""])
