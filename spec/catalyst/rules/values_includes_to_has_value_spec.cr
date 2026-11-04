@@ -31,6 +31,25 @@ module Catalyst
         end
       end
 
+      describe "#fix_replacement" do
+        it "rewrites values.includes? to has_value?" do
+          fix_for(rule, "h.values.includes?(v)").should eq("h.has_value?(v)")
+        end
+
+        it "keeps the rest of the line" do
+          fix_for(rule, "ok = h.values.includes?(v) && other")
+            .should eq("ok = h.has_value?(v) && other")
+        end
+
+        it "does not touch a values.includes? inside a string" do
+          fix_for(rule, %(log("h.values.includes?(v)"))).should be_nil
+        end
+
+        it "declines a line with two occurrences" do
+          fix_for(rule, "a.values.includes?(x) && b.values.includes?(y)").should be_nil
+        end
+      end
+
       describe "#id" do
         it "returns CAT-031" do
           rule.id.should eq("CAT-031")

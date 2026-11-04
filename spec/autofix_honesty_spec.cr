@@ -24,7 +24,7 @@ POSITIVE_CASES = {
   "CAT-020" => "IO::Memory.new.to_s",
   "CAT-021" => "h.values.each { |v| puts v }",
   "CAT-022" => "[1, 2, 3].shuffle.first",
-  "CAT-023" => %q(names.includes?("a")),
+  "CAT-023" => "s = \"names\"\ns.includes?(\"a\")",
   "CAT-025" => %q(File.open("f.txt")),
   "CAT-026" => %q(Dir.open(".")),
   "CAT-027" => %q(Tempfile.new("t")),

@@ -27,6 +27,25 @@ module Catalyst
         end
       end
 
+      describe "#fix_replacement" do
+        it "rewrites keys.includes? to has_key?" do
+          fix_for(rule, "h.keys.includes?(k)").should eq("h.has_key?(k)")
+        end
+
+        it "keeps the rest of the line" do
+          fix_for(rule, "ok = h.keys.includes?(k) && other")
+            .should eq("ok = h.has_key?(k) && other")
+        end
+
+        it "does not touch a keys.includes? inside a string" do
+          fix_for(rule, %(log("h.keys.includes?(k)"))).should be_nil
+        end
+
+        it "declines a line with two occurrences" do
+          fix_for(rule, "a.keys.includes?(x) && b.keys.includes?(y)").should be_nil
+        end
+      end
+
       describe "#id" do
         it "returns CAT-030" do
           rule.id.should eq("CAT-030")
