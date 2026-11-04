@@ -94,7 +94,11 @@ category_order = ["array", "hash", "string", "io", "resource", "type", "time", "
 sorted_results = results.sort do |a, b|
   cat_cmp = (category_order.index(a[:category]) || 99) <=> (category_order.index(b[:category]) || 99)
   if cat_cmp == 0
-    b[:best_ratio] <=> a[:best_ratio]
+    # NaN means the bench printed no speed claim; Float64#<=> returns nil for
+    # NaN and Array#sort raises on that, so rank it lowest explicitly.
+    rank_a = a[:best_ratio].nan? ? -1.0 : a[:best_ratio]
+    rank_b = b[:best_ratio].nan? ? -1.0 : b[:best_ratio]
+    rank_b <=> rank_a
   else
     cat_cmp
   end

@@ -19,6 +19,9 @@ module Catalyst
     "CAT-007" => "list = [1, 2]\nlist.reverse.each { |n| puts n }",
     "CAT-008" => "found = [1, 2].select { |n| n > 1 }.first",
     "CAT-018" => "s = \"abc\"\nif s.match(/re/)\nend",
+    "CAT-023" => "s = \"abc\"\ns.includes?(\"a\")",
+    "CAT-030" => "h = {\"a\" => 1}\nh.keys.includes?(\"a\")",
+    "CAT-031" => "h = {\"a\" => 1}\nh.values.includes?(1)",
     "CAT-039" => "class Foo\n  Regex.new(\"ab\")\nend",
   }
 end

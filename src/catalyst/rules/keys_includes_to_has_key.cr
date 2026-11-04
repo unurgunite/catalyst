@@ -13,6 +13,10 @@ module Catalyst
         "Use `has_key?` instead of `keys.includes?`"
       end
 
+      def auto_fixable? : Bool
+        true
+      end
+
       def check(node : Crystal::ASTNode, context : Context) : Array(Result)
         call = keys_includes_call(node)
         return [] of Result unless call
@@ -28,8 +32,17 @@ module Catalyst
           line: line,
           column: col,
           suggestion: "Replace `keys.includes?` with `has_key?`",
-          confidence: "high"
+          confidence: "high",
+          fix_replacement: fix_for(context.line_text(line))
         )]
+      end
+
+      # # `h.keys.includes?(k)` and `h.has_key?(k)` answer the same question and
+      # # `keys` allocates a copy of the key set first, so the rewrite is exact.
+      # # The line is only fixed when exactly one `keys.includes?` appears in
+      # # code, since a second one cannot be told apart from outside a string.
+      private def fix_for(line_text : String) : String?
+        sub_code_once(line_text, ".keys.includes?", ".has_key?")
       end
 
       private def keys_includes_call(node : Crystal::ASTNode) : Crystal::Call?
